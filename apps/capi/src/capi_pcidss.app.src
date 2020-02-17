@@ -1,0 +1,29 @@
+{application, capi_pcidss , [
+    {description, "A service that does something securely"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {capi_pcidss, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        genlib,
+        capi_woody_client,
+        damsel,
+        binbase_proto,
+        bender_proto,
+        lechiffre,
+        swag_server,
+        cowboy_cors,
+        cowboy_access_log,
+        rfc3339,
+        base64url,
+        snowflake,
+        woody_user_identity,
+        payproc_errors,
+        erl_health,
+        uac,
+        scoper,
+        cds_proto
+    ]},
+    {env, []}
+]}.
