@@ -1,0 +1,6 @@
+-sname capi_pcidss
+
+-setcookie capi_pcidss_cookie
+
++K true
++A 10
