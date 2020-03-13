@@ -5,8 +5,6 @@ log
 erl_crash.dump
 .tags*
 *.sublime-*
-*.iml
-.idea
 
 .DS_Store
 

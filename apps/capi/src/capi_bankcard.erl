@@ -4,7 +4,7 @@
 -include_lib("cds_proto/include/cds_proto_storage_thrift.hrl").
 
 -export([lookup_bank_info/2]).
--export([validate/4]).
+-export([validate/3]).
 -export([payment_system/1]).
 
 -type bank_info() :: #{
@@ -21,11 +21,7 @@
         issuer_country
     }.
 
--type cardholder_data() :: cds_proto_storage_thrift:'CardData'().
--type extra_card_data() :: #{
-    cardholder => binary(),
-    exp_date => {integer(), integer()}
-}.
+-type cardholder_data() :: cds_proto_storage_thrift:'PutCardData'().
 -type session_data() :: cds_proto_storage_thrift:'SessionData'().
 -type payment_system() :: dmsl_domain_thrift:'BankCardPaymentSystem'().
 -type reason() :: unrecognized |{invalid, cardnumber | cvv | exp_date, check()}.
@@ -157,21 +153,20 @@ decode_issuer_country(undefined) ->
 payment_system(BankInfo) ->
     maps:get(payment_system, BankInfo).
 
--spec validate(cardholder_data(), extra_card_data(), session_data() | undefined, payment_system()) ->
+-spec validate(cardholder_data(), session_data() | undefined, payment_system()) ->
     ok | {error, reason()}.
 
-validate(CardData, ExtraCardData, SessionData, PaymentSystem) ->
+validate(CardData, SessionData, PaymentSystem) ->
     Rulesets = get_payment_system_assertions(),
     Assertions = maps:get(PaymentSystem, Rulesets, []),
-    validate_card_data(merge_data(CardData, ExtraCardData, SessionData), Assertions).
+    validate_card_data(merge_data(CardData, SessionData), Assertions).
 
-merge_data(CardData, ExtraCardData, undefined) ->
-    maps:merge(convert_card_data(CardData), ExtraCardData);
-merge_data(CardData, ExtraCardData, #cds_SessionData{auth_data = AuthData}) ->
+merge_data(CardData, undefined) ->
+    convert_card_data(CardData);
+merge_data(CardData, #cds_SessionData{auth_data = AuthData}) ->
     CVV = get_cvv_from_session_data(AuthData),
-    CardDataMap0 = convert_card_data(CardData),
-    CardDataMap1 = maps:merge(CardDataMap0, ExtraCardData),
-    CardDataMap1#{cvv => maybe_undefined(CVV)}.
+    CardDataMap = convert_card_data(CardData),
+    CardDataMap#{cvv => maybe_undefined(CVV)}.
 
 get_cvv_from_session_data({card_security_code, AuthData}) ->
     AuthData#cds_CardSecurityCode.value;
@@ -322,11 +317,18 @@ get_payment_system_assertions() ->
     }.
 
 convert_card_data(CardData) ->
-    #cds_CardData {
-        pan = PAN
+    #cds_PutCardData {
+        pan = PAN,
+        cardholder_name = Cardholder,
+        exp_date = #cds_ExpDate{
+            month = Month,
+            year = Year
+        }
     } = CardData,
     #{
-        cardnumber => PAN
+        cardnumber => PAN,
+        cardholder => Cardholder,
+        exp_date => {Month, Year}
     }.
 
 maybe_undefined(<<>>) ->
