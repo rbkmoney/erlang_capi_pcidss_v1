@@ -327,11 +327,8 @@ encode_card_data(CardData) ->
     Cardholder = genlib_map:get(<<"cardHolder">>, CardData),
     CardNumber = genlib:to_binary(genlib_map:get(<<"cardNumber">>, CardData)),
     {
-        #cds_CardData{
-            pan = CardNumber,
-            %% TODO Remove after migration
-            exp_date = encode_cds_exp_date(ExpDate),
-            cardholder_name = Cardholder
+        #cds_PutCardData{
+            pan = CardNumber
         },
         genlib_map:compact(#{
             exp_date => ExpDate,
@@ -457,11 +454,8 @@ encode_tokenized_card_data(#paytoolprv_UnwrappedPaymentTool{
 }) ->
     ExpDate = {Month, Year},
     {
-        #cds_CardData{
-            pan = DPAN,
-            %% TODO Remove after migration
-            exp_date = encode_cds_exp_date(ExpDate),
-            cardholder_name = CardholderName
+        #cds_PutCardData{
+            pan = DPAN
         },
         genlib_map:compact(#{
             exp_date => ExpDate,
@@ -482,11 +476,8 @@ encode_tokenized_card_data(#paytoolprv_UnwrappedPaymentTool{
 }) ->
     ExpDate = {Month, Year},
     {
-        #cds_CardData{
-            pan = PAN,
-            %% TODO Remove after migration
-            exp_date = encode_cds_exp_date(ExpDate),
-            cardholder_name = CardholderName
+        #cds_PutCardData{
+            pan = PAN
         },
         genlib_map:compact(#{
             exp_date => ExpDate,
