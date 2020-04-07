@@ -351,14 +351,6 @@ encode_exp_date({Month, Year}) ->
         year = Year
     }.
 
-encode_cds_exp_date(undefined) ->
-    undefined;
-encode_cds_exp_date({Month, Year}) ->
-    #cds_ExpDate{
-        month = Month,
-        year = Year
-    }.
-
 process_payment_terminal_data(Data, _ReqCtx) ->
     PaymentTerminal = #domain_PaymentTerminal{
         terminal_type = binary_to_existing_atom(
