@@ -322,7 +322,7 @@ get_payment_system_assertions() ->
     }.
 
 convert_card_data(CardData) ->
-    #cds_CardData {
+    #cds_PutCardData {
         pan = PAN
     } = CardData,
     #{

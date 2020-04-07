@@ -270,7 +270,7 @@ prepare_client_ip(Context) ->
 process_card_data(Data, IdempotentKey, ReqCtx) ->
     {CardData, ExtraCardData} = encode_card_data(Data),
     SessionData = encode_session_data(Data),
-    BankInfo = get_bank_info(CardData#cds_CardData.pan, ReqCtx),
+    BankInfo = get_bank_info(CardData#cds_PutCardData.pan, ReqCtx),
     PaymentSystem = capi_bankcard:payment_system(BankInfo),
     case capi_bankcard:validate(CardData, ExtraCardData, SessionData, PaymentSystem) of
         ok ->
@@ -393,7 +393,7 @@ process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
     end,
     {CardData, ExtraCardData} = encode_tokenized_card_data(UnwrappedPaymentTool),
     SessionData = encode_tokenized_session_data(UnwrappedPaymentTool),
-    BankInfo = get_bank_info(CardData#cds_CardData.pan, ReqCtx),
+    BankInfo = get_bank_info(CardData#cds_PutCardData.pan, ReqCtx),
     PaymentSystem = capi_bankcard:payment_system(BankInfo),
     case capi_bankcard:validate(CardData, ExtraCardData, SessionData, PaymentSystem) of
         ok ->
