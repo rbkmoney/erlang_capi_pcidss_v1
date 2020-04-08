@@ -21,7 +21,7 @@
         issuer_country
     }.
 
--type cardholder_data() :: cds_proto_storage_thrift:'CardData'().
+-type cardholder_data() :: cds_proto_storage_thrift:'PutCardData'().
 -type extra_card_data() :: #{
     cardholder => binary(),
     exp_date => {integer(), integer()}
@@ -322,7 +322,7 @@ get_payment_system_assertions() ->
     }.
 
 convert_card_data(CardData) ->
-    #cds_CardData {
+    #cds_PutCardData {
         pan = PAN
     } = CardData,
     #{
