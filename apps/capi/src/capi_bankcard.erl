@@ -187,7 +187,10 @@ validate_card_data(CardData, Assertions) ->
     end.
 
 run_assertions(CardData, Assertions) ->
-    Env = #{now => calendar:universal_time()},
+    %% After 01.03.2020 users(payers) can't exchange bankcard with expiring date.
+    %% (Temporary decision)BankCard with expiration date after 01.03, not expired.
+    % Env = #{now => calendar:universal_time()},
+    Env = #{now => {{2020, 3, 1}, {0, 0, 0}}},
     genlib_map:foreach(
         fun(K, Checks) ->
             V = maps:get(K, CardData, undefined),
