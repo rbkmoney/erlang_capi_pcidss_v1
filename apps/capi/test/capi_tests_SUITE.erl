@@ -396,6 +396,9 @@ start_capi(Config) ->
             encryption_key_path => KeySource,
             decryption_key_paths => [KeySource]
         }},
+        {validation, #{
+            now => {{2020, 3, 1}, {0, 0, 0}}
+        }},
         {access_conf, #{
             jwt => #{
                 keyset => #{
