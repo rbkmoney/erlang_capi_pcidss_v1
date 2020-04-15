@@ -4,8 +4,9 @@
 -include_lib("cds_proto/include/cds_proto_storage_thrift.hrl").
 
 -export([lookup_bank_info/2]).
--export([validate/4]).
+-export([validate/5]).
 -export([payment_system/1]).
+-export([validation_env/0]).
 
 -type bank_info() :: #{
     payment_system := dmsl_domain_thrift:'BankCardPaymentSystem'(),
@@ -29,11 +30,21 @@
 -type session_data() :: cds_proto_storage_thrift:'SessionData'().
 -type payment_system() :: dmsl_domain_thrift:'BankCardPaymentSystem'().
 -type reason() :: unrecognized |{invalid, cardnumber | cvv | exp_date, check()}.
+-opaque validation_env() :: #{
+    now := calendar:datetime()
+}.
 
 -export_type([cardholder_data/0]).
 -export_type([session_data/0]).
 -export_type([payment_system/0]).
 -export_type([reason/0]).
+-export_type([validation_env/0]).
+
+-spec validation_env() -> validation_env().
+validation_env() ->
+    DefaultEnv = #{now => calendar:universal_time()},
+    Env = genlib_app:env(capi_pcidss, validation, #{}),
+    maps:merge(DefaultEnv, Env).
 
 -spec lookup_bank_info(_PAN :: binary(), woody_context:ctx()) ->
     {ok, bank_info()} | {error, lookup_error()}.
@@ -157,13 +168,13 @@ decode_issuer_country(undefined) ->
 payment_system(BankInfo) ->
     maps:get(payment_system, BankInfo).
 
--spec validate(cardholder_data(), extra_card_data(), session_data() | undefined, payment_system()) ->
+-spec validate(cardholder_data(), extra_card_data(), session_data() | undefined, payment_system(), validation_env()) ->
     ok | {error, reason()}.
 
-validate(CardData, ExtraCardData, SessionData, PaymentSystem) ->
+validate(CardData, ExtraCardData, SessionData, PaymentSystem, Env) ->
     Rulesets = get_payment_system_assertions(),
     Assertions = maps:get(PaymentSystem, Rulesets, []),
-    validate_card_data(merge_data(CardData, ExtraCardData, SessionData), Assertions).
+    validate_card_data(merge_data(CardData, ExtraCardData, SessionData), Assertions, Env).
 
 merge_data(CardData, ExtraCardData, undefined) ->
     maps:merge(convert_card_data(CardData), ExtraCardData);
@@ -180,14 +191,13 @@ get_cvv_from_session_data(_) ->
 
 %%
 
-validate_card_data(CardData, Assertions) ->
-    try run_assertions(CardData, Assertions) catch
+validate_card_data(CardData, Assertions, Env) ->
+    try run_assertions(CardData, Assertions, Env) catch
         Reason ->
             {error, Reason}
     end.
 
-run_assertions(CardData, Assertions) ->
-    Env = #{now => calendar:universal_time()},
+run_assertions(CardData, Assertions, Env) ->
     genlib_map:foreach(
         fun(K, Checks) ->
             V = maps:get(K, CardData, undefined),

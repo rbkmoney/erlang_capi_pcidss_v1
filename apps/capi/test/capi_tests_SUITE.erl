@@ -27,6 +27,7 @@
 -export([init/1]).
 
 -export([
+    expiration_date_fail_test/1,
     create_visa_payment_resource_ok_test/1,
     create_nspkmir_payment_resource_ok_test/1,
     create_euroset_payment_resource_ok_test/1,
@@ -68,6 +69,7 @@ groups() ->
     [
         {payment_resources, [],
             [
+                expiration_date_fail_test,
                 create_visa_payment_resource_ok_test,
                 create_nspkmir_payment_resource_ok_test,
                 create_euroset_payment_resource_ok_test,
@@ -165,13 +167,49 @@ create_visa_payment_resource_ok_test(Config) ->
             <<"paymentToolType">> => <<"CardData">>,
             <<"cardNumber">> => <<"4111111111111111">>,
             <<"cardHolder">> => CardHolder,
-            <<"expDate">> => <<"08/27">>,
+            <<"expDate">> => <<"03/20">>,
             <<"cvv">> => <<"232">>
         },
         <<"clientInfo">> => ClientInfo
     }),
     {ok, {bank_card, BankCard}} = capi_crypto:decrypt_payment_tool_token(PaymentToolToken),
     CardHolder = BankCard#domain_BankCard.cardholder_name.
+
+-spec expiration_date_fail_test(_) ->
+    _.
+expiration_date_fail_test(Config) ->
+    mock_services([
+        {cds_storage, fun
+            ('PutSession', _) -> {ok, ok};
+            ('PutCard', [
+                #'cds_PutCardData'{pan = <<"411111", _:6/binary, Mask:4/binary>>}
+            ]) ->
+                {ok, #'cds_PutCardResult'{
+                    bank_card = #cds_BankCard{
+                        token = ?STRING,
+                        bin = <<"411111">>,
+                        last_digits = Mask
+                    }
+                }}
+        end},
+        {bender, fun('GenerateID', _) -> {ok, capi_ct_helper_bender:get_result(<<"bender_key">>)} end},
+        {binbase, fun('Lookup', _) -> {ok, ?BINBASE_LOOKUP_RESULT(<<"VISA">>)} end}
+    ], Config),
+    ClientInfo = #{<<"fingerprint">> => <<"test fingerprint">>},
+    CardHolder = <<"Alexander Weinerschnitzel">>,
+    {error, {400, #{
+        <<"code">>    := <<"invalidRequest">>,
+        <<"message">> := <<"Invalid expiration date">>
+    }}} = capi_client_tokens:create_payment_resource(?config(context, Config), #{
+        <<"paymentTool">> => #{
+            <<"paymentToolType">> => <<"CardData">>,
+            <<"cardNumber">> => <<"4111111111111111">>,
+            <<"cardHolder">> => CardHolder,
+            <<"expDate">> => <<"02/20">>,
+            <<"cvv">> => <<"232">>
+        },
+        <<"clientInfo">> => ClientInfo
+    }).
 
 -spec create_nspkmir_payment_resource_ok_test(_) ->
     _.
@@ -357,6 +395,9 @@ start_capi(Config) ->
         {lechiffre_opts, #{
             encryption_key_path => KeySource,
             decryption_key_paths => [KeySource]
+        }},
+        {validation, #{
+            now => {{2020, 3, 1}, {0, 0, 0}}
         }},
         {access_conf, #{
             jwt => #{

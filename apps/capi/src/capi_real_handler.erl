@@ -272,7 +272,8 @@ process_card_data(Data, IdempotentKey, ReqCtx) ->
     SessionData = encode_session_data(Data),
     BankInfo = get_bank_info(CardData#cds_PutCardData.pan, ReqCtx),
     PaymentSystem = capi_bankcard:payment_system(BankInfo),
-    case capi_bankcard:validate(CardData, ExtraCardData, SessionData, PaymentSystem) of
+    ValidationEnv = capi_bankcard:validation_env(),
+    case capi_bankcard:validate(CardData, ExtraCardData, SessionData, PaymentSystem, ValidationEnv) of
         ok ->
             put_card_data_to_cds(CardData, ExtraCardData, SessionData, IdempotentKey, BankInfo, ReqCtx);
         {error, Error} ->
@@ -387,7 +388,8 @@ process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
     SessionData = encode_tokenized_session_data(UnwrappedPaymentTool),
     BankInfo = get_bank_info(CardData#cds_PutCardData.pan, ReqCtx),
     PaymentSystem = capi_bankcard:payment_system(BankInfo),
-    case capi_bankcard:validate(CardData, ExtraCardData, SessionData, PaymentSystem) of
+    ValidationEnv = capi_bankcard:validation_env(),
+    case capi_bankcard:validate(CardData, ExtraCardData, SessionData, PaymentSystem, ValidationEnv) of
         ok ->
             process_put_card_data_result(
                 put_card_data_to_cds(
