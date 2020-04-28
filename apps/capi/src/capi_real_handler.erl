@@ -138,10 +138,10 @@ create_context(#{'X-Request-ID' := RequestID}, AuthContext) ->
 
 collect_user_identity(AuthContext) ->
     genlib_map:compact(#{
-        id => capi_auth:get_subject_id(AuthContext),
+        id => uac_authorizer_jwt:get_subject_id(AuthContext),
         realm => ?REALM,
-        email => capi_auth:get_claim(<<"email">>, AuthContext, undefined),
-        username => capi_auth:get_claim(<<"name">>, AuthContext, undefined)
+        email => uac_authorizer_jwt:get_claim(<<"email">>, AuthContext, undefined),
+        username => uac_authorizer_jwt:get_claim(<<"name">>, AuthContext, undefined)
     }).
 
 logic_error(Code, Message) ->
@@ -169,7 +169,7 @@ get_peer_info(#{peer := Peer}) ->
     Peer.
 
 get_party_id(Context) ->
-    capi_auth:get_subject_id(get_auth_context(Context)).
+    uac_authorizer_jwt:get_subject_id(get_auth_context(Context)).
 
 decode_client_info(ClientInfo) ->
     #{

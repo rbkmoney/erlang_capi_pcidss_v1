@@ -1,31 +1,7 @@
 -module(capi_auth).
 
--export([get_subject_id/1]).
--export([get_claims/1]).
--export([get_claim/2]).
--export([get_claim/3]).
-
 -export([get_operation_access/2]).
-
--spec get_subject_id(uac:context()) -> binary().
-
-get_subject_id({_Id, {SubjectID, _ACL}, _}) ->
-    SubjectID.
-
--spec get_claims(uac:context()) -> uac:claims().
-
-get_claims({_Id, _Subject, Claims}) ->
-    Claims.
-
--spec get_claim(binary(), uac:context()) -> term().
-
-get_claim(ClaimName, {_Id, _Subject, Claims}) ->
-    maps:get(ClaimName, Claims).
-
--spec get_claim(binary(), uac:context(), term()) -> term().
-
-get_claim(ClaimName, {_Id, _Subject, Claims}, Default) ->
-     maps:get(ClaimName, Claims, Default).
+-export([get_access_config/0]).
 
 %%
 
@@ -36,3 +12,16 @@ get_claim(ClaimName, {_Id, _Subject, Claims}, Default) ->
 
 get_operation_access('CreatePaymentResource'     , _) ->
     [{[payment_resources], write}].
+
+-spec get_access_config() -> map().
+
+get_access_config() ->
+    #{
+        domain_name => <<"common-api">>,
+        resource_hierarchy => get_resource_hierarchy()
+    }.
+
+get_resource_hierarchy() ->
+    #{
+        payment_resources   => #{}
+    }.

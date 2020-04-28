@@ -27,7 +27,7 @@ init([]) ->
     {LogicHandler, LogicHandlerSpecs} = get_logic_handler_info(),
     HealthRoutes = [{'_', [erl_health_handle:get_route(genlib_app:env(capi_pcidss, health_checkers, []))]}],
     SwaggerSpec  = capi_swagger_server:child_spec({HealthRoutes, LogicHandler}),
-    UacConf      = genlib_app:env(capi_pcidss, access_conf),
+    UacConf      = get_uac_config(),
     ok           = uac:configure(UacConf),
     {ok, {
         {one_for_all, 0, 1},
@@ -42,4 +42,18 @@ get_logic_handler_info() ->
             {capi_real_handler, []};
         undefined ->
             exit(undefined_service_type)
+    end.
+
+get_uac_config() ->
+    maps:merge(
+        get_authorization_config(),
+        #{access => capi_auth:get_access_config()}
+    ).
+
+get_authorization_config() ->
+    case genlib_app:env(capi_pcidss, access_conf) of
+        undefined ->
+            exit(undefined_access_configuration);
+        Config ->
+            Config
     end.

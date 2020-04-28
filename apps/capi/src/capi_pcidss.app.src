@@ -15,7 +15,6 @@
         swag_server,
         cowboy_cors,
         cowboy_access_log,
-        rfc3339,
         base64url,
         snowflake,
         woody_user_identity,

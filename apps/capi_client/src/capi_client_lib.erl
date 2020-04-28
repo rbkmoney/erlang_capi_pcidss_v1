@@ -55,8 +55,8 @@ make_search_query_string(ParamList) ->
     map().
 prepare_param({limit, P})          -> #{<<"limit">> => genlib:to_binary(P)};
 prepare_param({offset, P})         -> #{<<"offset">> => genlib:to_binary(P)};
-prepare_param({from_time, P})      -> #{<<"fromTime">> => genlib_format:format_datetime_iso8601(P)};
-prepare_param({to_time, P})        -> #{<<"toTime">> => genlib_format:format_datetime_iso8601(P)};
+prepare_param({from_time, P})      -> #{<<"fromTime">> => format_datetime(P)};
+prepare_param({to_time, P})        -> #{<<"toTime">> => format_datetime(P)};
 prepare_param({status, P})         -> #{<<"status">> => genlib:to_binary(P)};
 prepare_param({split_unit, P})     -> #{<<"splitUnit">> => genlib:to_binary(P)};
 prepare_param({split_size, P})     -> #{<<"splitSize">> => genlib:to_binary(P)};
@@ -178,3 +178,7 @@ decode_body(Body) when is_binary(Body) ->
     jsx:decode(Body, [return_maps]);
 decode_body(Body) ->
     Body.
+
+format_datetime(P) ->
+    Seconds = genlib_time:daytime_to_unixtime(P),
+    genlib_rfc3339:format_relaxed(Seconds, second).

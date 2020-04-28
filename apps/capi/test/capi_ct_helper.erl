@@ -60,13 +60,18 @@ issue_token(PartyID, ACL, LifeTime) ->
     }.
 
 issue_token(PartyID, ACL, LifeTime, ExtraProperties) ->
-    Claims = maps:merge(#{?STRING => ?STRING}, ExtraProperties),
+    Claims = maps:merge(#{
+        ?STRING => ?STRING,
+        <<"exp">> => LifeTime,
+        <<"resource_access">> => #{
+            <<"common-api">> => uac_acl:from_list(ACL)
+        }
+    }, ExtraProperties),
     UniqueId = get_unique_id(),
     genlib:unwrap(
         uac_authorizer_jwt:issue(
             UniqueId,
-            LifeTime,
-            {PartyID, uac_acl:from_list(ACL)},
+            PartyID,
             Claims,
             capi_pcidss
         )
