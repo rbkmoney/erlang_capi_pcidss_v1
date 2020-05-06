@@ -19,6 +19,7 @@
 
 %% @WARNING Must be refactored in case of different classes of users using this API
 -define(REALM, <<"external">>).
+-define(DOMAIN, <<"common-api">>).
 
 -define(SWAG_HANDLER_SCOPE, swag_handler).
 
@@ -48,7 +49,9 @@ authorize_api_key(OperationID, ApiKey, _HandlerOpts) ->
     end).
 
 get_verification_opts() ->
-    #{}.
+    #{
+        domains_to_decode => [?DOMAIN]
+    }.
 
 -type request_data() :: #{atom() | binary() => term()}.
 -type handler_opts() :: swag_server:handler_opts(_).
