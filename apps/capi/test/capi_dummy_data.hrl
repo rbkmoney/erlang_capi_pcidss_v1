@@ -14,7 +14,8 @@
         payment_system = PaymentSystem,
         bank_name = ?STRING,
         iso_country_code = <<"KAZ">>,
-        card_type = debit
+        card_type = debit,
+        bin_data_id = {i, 1}
     },
     version = ?INTEGER
 }).

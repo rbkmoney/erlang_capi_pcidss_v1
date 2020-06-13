@@ -151,7 +151,8 @@ create_visa_payment_resource_ok_test(Config) ->
                 }}
         end},
         {bender, fun('GenerateID', _) -> {ok, capi_ct_helper_bender:get_result(<<"bender_key">>)} end},
-        {binbase, fun('Lookup', _) -> {ok, ?BINBASE_LOOKUP_RESULT(<<"VISA">>)} end}
+        {binbase, fun('Lookup', _) ->
+            {ok, ?BINBASE_LOOKUP_RESULT(<<"VISA">>)} end}
     ], Config),
     ClientInfo = #{<<"fingerprint">> => <<"test fingerprint">>},
     CardHolder = <<"Alexander Weinerschnitzel">>,
