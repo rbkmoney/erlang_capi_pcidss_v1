@@ -12,6 +12,7 @@
     payment_system := dmsl_domain_thrift:'BankCardPaymentSystem'(),
     bank_name      := binary(),
     issuer_country := dmsl_domain_thrift:'Residence'() | undefined,
+    category       := binary() | undefined,
     metadata       := map()
 }.
 
@@ -64,6 +65,7 @@ decode_bank_info(#'binbase_ResponseData'{bin_data = BinData, version = Version})
             payment_system => decode_payment_system(BinData#binbase_BinData.payment_system),
             bank_name      => BinData#binbase_BinData.bank_name,
             issuer_country => decode_issuer_country(BinData#binbase_BinData.iso_country_code),
+            category       => BinData#binbase_BinData.category,
             metadata       => #{
                 <<"version">> => Version
             }

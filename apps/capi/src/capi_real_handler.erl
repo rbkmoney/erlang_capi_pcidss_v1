@@ -228,7 +228,7 @@ decode_payment_tool_details({crypto_currency, CryptoCurrency}) ->
     }.
 
 decode_bank_card_details(BankCard, V) ->
-    LastDigits = decode_last_digits(BankCard#domain_BankCard.masked_pan),
+    LastDigits = decode_last_digits(BankCard#domain_BankCard.last_digits),
     Bin = BankCard#domain_BankCard.bin,
     merge_and_compact(V, #{
         <<"lastDigits">>     => LastDigits,
@@ -333,15 +333,17 @@ expand_card_info(BankCard, BankInfo, ExtraCardData) ->
         payment_system  := PaymentSystem,
         bank_name       := BankName,
         issuer_country  := IssuerCountry,
+        category        := Category,
         metadata        := Metadata
     } = BankInfo,
     #domain_BankCard{
         token = BankCard#cds_BankCard.token,
         bin = BankCard#cds_BankCard.bin,
-        masked_pan = BankCard#cds_BankCard.last_digits,
+        last_digits = BankCard#cds_BankCard.last_digits,
         exp_date = encode_exp_date(genlib_map:get(exp_date, ExtraCardData)),
         payment_system = PaymentSystem,
         issuer_country = IssuerCountry,
+        category = Category,
         bank_name = BankName,
         cardholder_name = genlib_map:get(cardholder, ExtraCardData),
         metadata = #{
@@ -550,7 +552,7 @@ process_put_card_data_result(
     {
         {bank_card, BankCard#domain_BankCard{
             payment_system = PaymentSystem,
-            masked_pan     = genlib:define(Last4, BankCard#domain_BankCard.masked_pan),
+            last_digits    = genlib:define(Last4, BankCard#domain_BankCard.last_digits),
             token_provider = get_payment_token_provider(PaymentDetails, PaymentData)
         }},
         SessionID
