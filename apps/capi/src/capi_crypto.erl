@@ -2,19 +2,16 @@
 
 -include_lib("damsel/include/dmsl_payment_tool_token_thrift.hrl").
 
--type encrypted_token()     :: binary().
--type payment_tool()        :: dmsl_domain_thrift:'PaymentTool'().
--type payment_tool_token()  :: dmsl_payment_tool_token_thrift:'PaymentToolToken'().
-
+-type encrypted_token() :: binary().
+-type payment_tool() :: dmsl_domain_thrift:'PaymentTool'().
+-type payment_tool_token() :: dmsl_payment_tool_token_thrift:'PaymentToolToken'().
 
 -export_type([encrypted_token/0]).
 
 -export([create_encrypted_payment_tool_token/2]).
 -export([decrypt_payment_tool_token/1]).
 
--spec create_encrypted_payment_tool_token(binary(), payment_tool()) ->
-    encrypted_token().
-
+-spec create_encrypted_payment_tool_token(binary(), payment_tool()) -> encrypted_token().
 create_encrypted_payment_tool_token(IdempotentKey, PaymentTool) ->
     PaymentToolToken = encode_payment_tool_token(PaymentTool),
     EncryptionParams = create_encryption_params(IdempotentKey),
@@ -24,10 +21,9 @@ create_encrypted_payment_tool_token(IdempotentKey, PaymentTool) ->
     <<TokenVersion/binary, ".", EncodedToken/binary>>.
 
 -spec decrypt_payment_tool_token(encrypted_token()) ->
-    unrecognized |
-    {ok, payment_tool()} |
-    {error, lechiffre:decoding_error()}.
-
+    unrecognized
+    | {ok, payment_tool()}
+    | {error, lechiffre:decoding_error()}.
 decrypt_payment_tool_token(Token) ->
     Ver = payment_tool_token_version(),
     Size = byte_size(Ver),
@@ -55,9 +51,7 @@ decrypt_token(EncryptedPaymentToolToken) ->
             Error
     end.
 
--spec encode_payment_tool_token(payment_tool()) ->
-    payment_tool_token().
-
+-spec encode_payment_tool_token(payment_tool()) -> payment_tool_token().
 encode_payment_tool_token({bank_card, BankCard}) ->
     {bank_card_payload, #ptt_BankCardPayload{
         bank_card = BankCard
@@ -75,9 +69,7 @@ encode_payment_tool_token({crypto_currency, CryptoCurrency}) ->
         crypto_currency = CryptoCurrency
     }}.
 
--spec decode_payment_tool_token(payment_tool_token()) ->
-    payment_tool().
-
+-spec decode_payment_tool_token(payment_tool_token()) -> payment_tool().
 decode_payment_tool_token(PaymentToolToken) ->
     case PaymentToolToken of
         {bank_card_payload, Payload} ->

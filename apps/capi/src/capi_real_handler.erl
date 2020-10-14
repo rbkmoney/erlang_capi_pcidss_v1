@@ -28,16 +28,15 @@
 
 -define(DEFAULT_INVOICE_META, #{}).
 -define(DEFAULT_INVOICE_TPL_META, #{}).
--define(DEFAULT_URL_LIFETIME, 60). % seconds
+% seconds
+-define(DEFAULT_URL_LIFETIME, 60).
 
--define(payment_institution_ref(PaymentInstitutionID),
-    #domain_PaymentInstitutionRef{id = PaymentInstitutionID}).
+-define(payment_institution_ref(PaymentInstitutionID), #domain_PaymentInstitutionRef{id = PaymentInstitutionID}).
 
 -define(CAPI_NS, <<"com.rbkmoney.capi">>).
 
 -spec authorize_api_key(swag_server:operation_id(), swag_server:api_key(), handler_opts()) ->
     Result :: false | {true, uac:context()}.
-
 authorize_api_key(OperationID, ApiKey, _HandlerOpts) ->
     scoper:scope(?SWAG_HANDLER_SCOPE, #{operation_id => OperationID}, fun() ->
         _ = logger:debug("Api key authorization started"),
@@ -51,21 +50,19 @@ authorize_api_key(OperationID, ApiKey, _HandlerOpts) ->
         end
     end).
 
--spec map_error(error_type(), swag_server_validation:error()) ->
-    swag_server:error_reason().
-
+-spec map_error(error_type(), swag_server_validation:error()) -> swag_server:error_reason().
 map_error(validation_error, Error) ->
     Type = genlib:to_binary(maps:get(type, Error)),
     Name = genlib:to_binary(maps:get(param_name, Error)),
-    Message = case maps:get(description, Error, undefined) of
-        undefined ->
-            <<"Request parameter: ", Name/binary, ", error type: ", Type/binary>>;
-        Description ->
-            DescriptionBin = genlib:to_binary(Description),
-            <<"Request parameter: ", Name/binary,
-            ", error type: ", Type/binary,
-            ", description: ", DescriptionBin/binary>>
-    end,
+    Message =
+        case maps:get(description, Error, undefined) of
+            undefined ->
+                <<"Request parameter: ", Name/binary, ", error type: ", Type/binary>>;
+            Description ->
+                DescriptionBin = genlib:to_binary(Description),
+                <<"Request parameter: ", Name/binary, ", error type: ", Type/binary, ", description: ",
+                    DescriptionBin/binary>>
+        end,
     jsx:encode(#{
         <<"code">> => <<"invalidRequest">>,
         <<"message">> => Message
@@ -84,9 +81,7 @@ get_verification_opts() ->
     Req :: request_data(),
     Context :: swag_server:request_context(),
     handler_opts()
-) ->
-    {ok | error, swag_server:response()}.
-
+) -> {ok | error, swag_server:response()}.
 handle_request(OperationID, Req, Context, _HandlerOpts) ->
     scoper:scope(
         ?SWAG_HANDLER_SCOPE,
@@ -118,28 +113,28 @@ handle_request_(OperationID, Req, Context) ->
     Req :: request_data(),
     Context :: swag_server:request_context(),
     ReqCtx :: woody_context:ctx()
-) ->
-    {Code :: non_neg_integer(), Headers :: #{}, Response :: #{}}.
-
+) -> {Code :: non_neg_integer(), Headers :: #{}, Response :: #{}}.
 process_request('CreatePaymentResource' = OperationID, Req, Context, ReqCtx) ->
     Params = maps:get('PaymentResourceParams', Req),
     ClientInfo = enrich_client_info(maps:get(<<"clientInfo">>, Params), Context),
     PartyID = get_party_id(Context),
     try
-        Data = maps:get(<<"paymentTool">>, Params), % "V" !!!!
+        % "V" !!!!
+        Data = maps:get(<<"paymentTool">>, Params),
         IdempotentKey = capi_bender:get_idempotent_key(OperationID, PartyID, undefined),
-        {PaymentTool, PaymentSessionID} = case Data of
-            #{<<"paymentToolType">> := <<"CardData">>} ->
-                process_card_data(Data, IdempotentKey, ReqCtx);
-            #{<<"paymentToolType">> := <<"PaymentTerminalData">>} ->
-                process_payment_terminal_data(Data, ReqCtx);
-            #{<<"paymentToolType">> := <<"DigitalWalletData">>} ->
-                process_digital_wallet_data(Data, ReqCtx);
-            #{<<"paymentToolType">> := <<"TokenizedCardData">>} ->
-                process_tokenized_card_data(Data, IdempotentKey, ReqCtx);
-            #{<<"paymentToolType">> := <<"CryptoWalletData">>} ->
-                process_crypto_wallet_data(Data, ReqCtx)
-        end,
+        {PaymentTool, PaymentSessionID} =
+            case Data of
+                #{<<"paymentToolType">> := <<"CardData">>} ->
+                    process_card_data(Data, IdempotentKey, ReqCtx);
+                #{<<"paymentToolType">> := <<"PaymentTerminalData">>} ->
+                    process_payment_terminal_data(Data, ReqCtx);
+                #{<<"paymentToolType">> := <<"DigitalWalletData">>} ->
+                    process_digital_wallet_data(Data, ReqCtx);
+                #{<<"paymentToolType">> := <<"TokenizedCardData">>} ->
+                    process_tokenized_card_data(Data, IdempotentKey, ReqCtx);
+                #{<<"paymentToolType">> := <<"CryptoWalletData">>} ->
+                    process_crypto_wallet_data(Data, ReqCtx)
+            end,
         PaymentResource = #domain_DisposablePaymentResource{
             payment_tool = PaymentTool,
             payment_session_id = PaymentSessionID,
@@ -180,12 +175,13 @@ parse_exp_date(undefined) ->
     undefined;
 parse_exp_date(ExpDate) when is_binary(ExpDate) ->
     [Month, Year0] = binary:split(ExpDate, <<"/">>),
-    Year = case genlib:to_int(Year0) of
-        Y when Y < 100 ->
-            2000 + Y;
-        Y ->
-            Y
-    end,
+    Year =
+        case genlib:to_int(Year0) of
+            Y when Y < 100 ->
+                2000 + Y;
+            Y ->
+                Y
+        end,
     {genlib:to_int(Month), Year}.
 
 get_auth_context(#{auth_context := AuthContext}) ->
@@ -231,11 +227,11 @@ decode_bank_card_details(BankCard, V) ->
     LastDigits = decode_last_digits(BankCard#domain_BankCard.last_digits),
     Bin = BankCard#domain_BankCard.bin,
     merge_and_compact(V, #{
-        <<"lastDigits">>     => LastDigits,
-        <<"bin">>            => Bin,
+        <<"lastDigits">> => LastDigits,
+        <<"bin">> => Bin,
         <<"cardNumberMask">> => decode_masked_pan(Bin, LastDigits),
-        <<"paymentSystem" >> => genlib:to_binary(BankCard#domain_BankCard.payment_system),
-        <<"tokenProvider" >> => decode_token_provider(BankCard#domain_BankCard.token_provider)
+        <<"paymentSystem">> => genlib:to_binary(BankCard#domain_BankCard.payment_system),
+        <<"tokenProvider">> => decode_token_provider(BankCard#domain_BankCard.token_provider)
     }).
 
 decode_token_provider(Provider) when Provider /= undefined ->
@@ -243,17 +239,23 @@ decode_token_provider(Provider) when Provider /= undefined ->
 decode_token_provider(undefined) ->
     undefined.
 
-decode_payment_terminal_details(#domain_PaymentTerminal{
-    terminal_type = Type
-}, V) ->
+decode_payment_terminal_details(
+    #domain_PaymentTerminal{
+        terminal_type = Type
+    },
+    V
+) ->
     V#{
         <<"provider">> => genlib:to_binary(Type)
     }.
 
-decode_digital_wallet_details(#domain_DigitalWallet{
-    provider = qiwi,
-    id = ID
-}, V) ->
+decode_digital_wallet_details(
+    #domain_DigitalWallet{
+        provider = qiwi,
+        id = ID
+    },
+    V
+) ->
     V#{
         <<"digitalWalletDetailsType">> => <<"DigitalWalletDetailsQIWI">>,
         <<"phoneNumberMask">> => mask_phone_number(ID)
@@ -274,7 +276,6 @@ decode_masked_pan(Bin, LastDigits) ->
 
 mask_phone_number(PhoneNumber) ->
     genlib_string:redact(PhoneNumber, <<"^\\+\\d(\\d{1,10}?)\\d{2,4}$">>).
-
 
 process_woody_error(_Source, result_unexpected, _Details) ->
     {error, reply_5xx(500)};
@@ -306,7 +307,6 @@ process_card_data(Data, IdempotentKey, ReqCtx) ->
             throw({ok, validation_error(Error)})
     end.
 
-
 put_card_to_cds(PutCardData, ExtraCardData, BankInfo, ReqCtx) ->
     case service_call(cds_storage, 'PutCard', [PutCardData], ReqCtx) of
         {ok, #cds_PutCardResult{bank_card = BankCard}} ->
@@ -330,11 +330,11 @@ put_card_data_to_cds(PutCardData, ExtraCardData, SessionData, IdempotentKey, Ban
 
 expand_card_info(BankCard, BankInfo, ExtraCardData) ->
     #{
-        payment_system  := PaymentSystem,
-        bank_name       := BankName,
-        issuer_country  := IssuerCountry,
-        category        := Category,
-        metadata        := Metadata
+        payment_system := PaymentSystem,
+        bank_name := BankName,
+        issuer_country := IssuerCountry,
+        category := Category,
+        metadata := Metadata
     } = BankInfo,
     #domain_BankCard{
         token = BankCard#cds_BankCard.token,
@@ -367,9 +367,10 @@ encode_card_data(CardData) ->
 
 encode_session_data(CardData) ->
     #cds_SessionData{
-        auth_data = {card_security_code, #cds_CardSecurityCode{
-            value = genlib_map:get(<<"cvv">>, CardData)
-        }}
+        auth_data =
+            {card_security_code, #cds_CardSecurityCode{
+                value = genlib_map:get(<<"cvv">>, CardData)
+            }}
     }.
 
 encode_exp_date(undefined) ->
@@ -390,13 +391,14 @@ process_payment_terminal_data(Data, _ReqCtx) ->
     {{payment_terminal, PaymentTerminal}, <<>>}.
 
 process_digital_wallet_data(Data, _ReqCtx) ->
-    DigitalWallet = case Data of
-        #{<<"digitalWalletType">> := <<"DigitalWalletQIWI">>} ->
-            #domain_DigitalWallet{
-                provider = qiwi,
-                id = maps:get(<<"phoneNumber">>, Data)
-            }
-    end,
+    DigitalWallet =
+        case Data of
+            #{<<"digitalWalletType">> := <<"DigitalWalletQIWI">>} ->
+                #domain_DigitalWallet{
+                    provider = qiwi,
+                    id = maps:get(<<"phoneNumber">>, Data)
+                }
+        end,
     {{digital_wallet, DigitalWallet}, <<>>}.
 
 process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
@@ -406,12 +408,13 @@ process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
         [encode_wrapped_payment_tool(Data)],
         ReqCtx
     ),
-    UnwrappedPaymentTool = case CallResult of
-        {ok, Tool} ->
-            Tool;
-        {exception, #'InvalidRequest'{}} ->
-            throw({ok, {400, #{}, logic_error(invalidRequest, <<"Tokenized card data is invalid">>)}})
-    end,
+    UnwrappedPaymentTool =
+        case CallResult of
+            {ok, Tool} ->
+                Tool;
+            {exception, #'InvalidRequest'{}} ->
+                throw({ok, {400, #{}, logic_error(invalidRequest, <<"Tokenized card data is invalid">>)}})
+        end,
     {CardData, ExtraCardData} = encode_tokenized_card_data(UnwrappedPaymentTool),
     SessionData = encode_tokenized_session_data(UnwrappedPaymentTool),
     BankInfo = get_bank_info(CardData#cds_PutCardData.pan, ReqCtx),
@@ -439,37 +442,42 @@ process_crypto_wallet_data(Data, _ReqCtx) ->
     {{crypto_currency, convert_crypto_currency_from_swag(CryptoCurrency)}, <<>>}.
 
 encode_tokenized_session_data(#paytoolprv_UnwrappedPaymentTool{
-    payment_data = {tokenized_card, #paytoolprv_TokenizedCard{
-        auth_data = {auth_3ds, #paytoolprv_Auth3DS{
-            cryptogram = Cryptogram,
-            eci = ECI
+    payment_data =
+        {tokenized_card, #paytoolprv_TokenizedCard{
+            auth_data =
+                {auth_3ds, #paytoolprv_Auth3DS{
+                    cryptogram = Cryptogram,
+                    eci = ECI
+                }}
         }}
-    }}
 }) ->
     #cds_SessionData{
-        auth_data = {auth_3ds, #cds_Auth3DS{
-            cryptogram = Cryptogram,
-            eci = ECI
-        }}
+        auth_data =
+            {auth_3ds, #cds_Auth3DS{
+                cryptogram = Cryptogram,
+                eci = ECI
+            }}
     };
 encode_tokenized_session_data(#paytoolprv_UnwrappedPaymentTool{
     payment_data = {card, #paytoolprv_Card{}}
 }) ->
     #cds_SessionData{
-        auth_data = {card_security_code, #cds_CardSecurityCode{
-            %% TODO dirty hack for test GooglePay card data
-            value = <<"">>
-        }}
+        auth_data =
+            {card_security_code, #cds_CardSecurityCode{
+                %% TODO dirty hack for test GooglePay card data
+                value = <<"">>
+            }}
     }.
 
 encode_tokenized_card_data(#paytoolprv_UnwrappedPaymentTool{
-    payment_data = {tokenized_card, #paytoolprv_TokenizedCard{
-        dpan = DPAN,
-        exp_date = #paytoolprv_ExpDate{
-            month = Month,
-            year = Year
-        }
-    }},
+    payment_data =
+        {tokenized_card, #paytoolprv_TokenizedCard{
+            dpan = DPAN,
+            exp_date = #paytoolprv_ExpDate{
+                month = Month,
+                year = Year
+            }
+        }},
     card_info = #paytoolprv_CardInfo{
         cardholder_name = CardholderName
     }
@@ -485,13 +493,14 @@ encode_tokenized_card_data(#paytoolprv_UnwrappedPaymentTool{
         })
     };
 encode_tokenized_card_data(#paytoolprv_UnwrappedPaymentTool{
-    payment_data = {card, #paytoolprv_Card{
-        pan = PAN,
-        exp_date = #paytoolprv_ExpDate{
-            month = Month,
-            year = Year
-        }
-    }},
+    payment_data =
+        {card, #paytoolprv_Card{
+            pan = PAN,
+            exp_date = #paytoolprv_ExpDate{
+                month = Month,
+                year = Year
+            }
+        }},
     card_info = #paytoolprv_CardInfo{
         cardholder_name = CardholderName
     }
@@ -512,17 +521,17 @@ encode_wrapped_payment_tool(Data) ->
         request = encode_payment_request(Data)
     }.
 
-encode_payment_request(#{<<"provider" >> := <<"ApplePay">>} = Data) ->
+encode_payment_request(#{<<"provider">> := <<"ApplePay">>} = Data) ->
     {apple, #paytoolprv_ApplePayRequest{
         merchant_id = maps:get(<<"merchantID">>, Data),
         payment_token = encode_content(json, maps:get(<<"paymentToken">>, Data))
     }};
-encode_payment_request(#{<<"provider" >> := <<"GooglePay">>} = Data) ->
+encode_payment_request(#{<<"provider">> := <<"GooglePay">>} = Data) ->
     {google, #paytoolprv_GooglePayRequest{
         gateway_merchant_id = maps:get(<<"gatewayMerchantID">>, Data),
         payment_token = encode_content(json, maps:get(<<"paymentToken">>, Data))
     }};
-encode_payment_request(#{<<"provider" >> := <<"SamsungPay">>} = Data) ->
+encode_payment_request(#{<<"provider">> := <<"SamsungPay">>} = Data) ->
     {samsung, #paytoolprv_SamsungPayRequest{
         service_id = genlib_map:get(<<"serviceID">>, Data),
         reference_id = genlib_map:get(<<"referenceID">>, Data)
@@ -543,7 +552,7 @@ process_put_card_data_result(
     #paytoolprv_UnwrappedPaymentTool{
         card_info = #paytoolprv_CardInfo{
             payment_system = PaymentSystem,
-            last_4_digits  = Last4
+            last_4_digits = Last4
         },
         payment_data = PaymentData,
         details = PaymentDetails
@@ -552,7 +561,7 @@ process_put_card_data_result(
     {
         {bank_card, BankCard#domain_BankCard{
             payment_system = PaymentSystem,
-            last_digits    = genlib:define(Last4, BankCard#domain_BankCard.last_digits),
+            last_digits = genlib:define(Last4, BankCard#domain_BankCard.last_digits),
             token_provider = get_payment_token_provider(PaymentDetails, PaymentData)
         }},
         SessionID
@@ -581,7 +590,6 @@ get_payment_token_provider(_PaymentDetails, {card, _}) ->
     % in order to make our internal services think of it as if it was good ol' plain bank card. Without a
     % CVV though. A better solution would be to distinguish between a _token provider_ and an _origin_.
     undefined;
-
 get_payment_token_provider({apple, _}, _PaymentData) ->
     applepay;
 get_payment_token_provider({google, _}, _PaymentData) ->
@@ -596,14 +604,12 @@ wrap_payment_session(ClientInfo, PaymentSession) ->
     }).
 
 -spec convert_crypto_currency_from_swag(binary()) -> atom().
-
 convert_crypto_currency_from_swag(<<"bitcoinCash">>) ->
     bitcoin_cash;
 convert_crypto_currency_from_swag(CryptoCurrency) when is_binary(CryptoCurrency) ->
     binary_to_existing_atom(CryptoCurrency, utf8).
 
 -spec convert_crypto_currency_to_swag(atom()) -> binary().
-
 convert_crypto_currency_to_swag(bitcoin_cash) ->
     <<"bitcoinCash">>;
 convert_crypto_currency_to_swag(CryptoCurrency) when is_atom(CryptoCurrency) ->
@@ -621,18 +627,18 @@ get_bank_info(CardDataPan, Context) ->
             throw({ok, logic_error(invalidRequest, <<"Unsupported card">>)})
     end.
 
--spec validation_error
-    (capi_bankcard:reason()) -> swag_server:response().
-
+-spec validation_error(capi_bankcard:reason()) -> swag_server:response().
 validation_error(unrecognized) ->
     Data = #{
         <<"code">> => <<"invalidRequest">>,
-        <<"message">> => <<"Unrecognized bank card issuer">>},
+        <<"message">> => <<"Unrecognized bank card issuer">>
+    },
     create_error_resp(400, Data);
 validation_error({invalid, K, C}) ->
     Data = #{
         <<"code">> => <<"invalidRequest">>,
-        <<"message">> => validation_msg(C, K)},
+        <<"message">> => validation_msg(C, K)
+    },
     create_error_resp(400, Data).
 
 validation_msg(expiration, _Key) ->
@@ -651,5 +657,6 @@ key_to_binary(cvv) ->
 
 create_error_resp(Code, Data) ->
     create_error_resp(Code, #{}, Data).
+
 create_error_resp(Code, Headers, Data) ->
     {Code, Headers, Data}.
