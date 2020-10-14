@@ -316,7 +316,9 @@ create_crypto_payment_resource_ok_test(Config) ->
 create_applepay_tokenized_payment_resource_ok_test(Config) ->
     mock_services(
         [
-            {payment_tool_provider_apple_pay, fun('Unwrap', _) -> {ok, ?UNWRAPPED_PAYMENT_TOOL(?APPLE_PAY_DETAILS)} end},
+            {payment_tool_provider_apple_pay, fun('Unwrap', _) ->
+                {ok, ?UNWRAPPED_PAYMENT_TOOL(?APPLE_PAY_DETAILS)}
+            end},
             {cds_storage, fun
                 ('PutSession', _) -> {ok, ok};
                 ('PutCard', _) -> {ok, ?PUT_CARD_RESULT}
