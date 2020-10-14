@@ -10,27 +10,28 @@
 
 -type bank_info() :: #{
     payment_system := dmsl_domain_thrift:'BankCardPaymentSystem'(),
-    bank_name      := binary(),
+    bank_name := binary(),
     issuer_country := dmsl_domain_thrift:'Residence'() | undefined,
-    category       := binary() | undefined,
-    metadata       := map()
+    category := binary() | undefined,
+    metadata := map()
 }.
 
 -type lookup_error() ::
-    notfound |
-    {invalid,
-        payment_system |
-        issuer_country
-    }.
+    notfound
+    | {invalid,
+        payment_system
+        | issuer_country}.
 
 -type cardholder_data() :: cds_proto_storage_thrift:'PutCardData'().
 -type extra_card_data() :: #{
     cardholder => binary(),
     exp_date => {integer(), integer()}
 }.
+
 -type session_data() :: cds_proto_storage_thrift:'SessionData'().
 -type payment_system() :: dmsl_domain_thrift:'BankCardPaymentSystem'().
--type reason() :: unrecognized |{invalid, cardnumber | cvv | exp_date, check()}.
+-type reason() :: unrecognized | {invalid, cardnumber | cvv | exp_date, check()}.
+
 -opaque validation_env() :: #{
     now := calendar:datetime()
 }.
@@ -47,9 +48,7 @@ validation_env() ->
     Env = genlib_app:env(capi_pcidss, validation, #{}),
     maps:merge(DefaultEnv, Env).
 
--spec lookup_bank_info(_PAN :: binary(), woody_context:ctx()) ->
-    {ok, bank_info()} | {error, lookup_error()}.
-
+-spec lookup_bank_info(_PAN :: binary(), woody_context:ctx()) -> {ok, bank_info()} | {error, lookup_error()}.
 lookup_bank_info(PAN, WoodyCtx) ->
     RequestVersion = {'last', #binbase_Last{}},
     case capi_woody_client:call_service(binbase, 'Lookup', [PAN, RequestVersion], WoodyCtx) of
@@ -63,10 +62,10 @@ decode_bank_info(#'binbase_ResponseData'{bin_data = BinData, version = Version})
     try
         {ok, #{
             payment_system => decode_payment_system(BinData#binbase_BinData.payment_system),
-            bank_name      => BinData#binbase_BinData.bank_name,
+            bank_name => BinData#binbase_BinData.bank_name,
             issuer_country => decode_issuer_country(BinData#binbase_BinData.iso_country_code),
-            category       => BinData#binbase_BinData.category,
-            metadata       => #{
+            category => BinData#binbase_BinData.category,
+            metadata => #{
                 <<"version">> => Version
             }
         }}
@@ -81,76 +80,131 @@ decode_bank_info(#'binbase_ResponseData'{bin_data = BinData, version = Version})
 %%
 %% List of known payment systems as of https://github.com/rbkmoney/binbase-data/commit/dcfabb1e.
 %% Please keep in sorted order.
--spec decode_payment_system(binary()) ->
-    dmsl_domain_thrift:'BankCardPaymentSystem'().
-
-decode_payment_system(<<"AMERICAN EXPRESS">>)           -> amex;
-decode_payment_system(<<"AMERICAN EXPRESS COMPANY">>)   -> amex;
-decode_payment_system(<<"ATM CARD">>)                   -> ?invalid(payment_system);
-decode_payment_system(<<"ATOS PRIVATE LABEL">>)         -> ?invalid(payment_system);
-decode_payment_system(<<"AURA">>)                       -> ?invalid(payment_system);
-decode_payment_system(<<"BANKCARD(INACTIVE)">>)         -> ?invalid(payment_system);
-decode_payment_system(<<"BP FUEL CARD">>)               -> ?invalid(payment_system);
-decode_payment_system(<<"CABAL">>)                      -> ?invalid(payment_system);
-decode_payment_system(<<"CARNET">>)                     -> ?invalid(payment_system);
-decode_payment_system(<<"CHINA UNION PAY">>)            -> unionpay;
-decode_payment_system(<<"CHJONES FUEL CARD">>)          -> ?invalid(payment_system);
-decode_payment_system(<<"CIRRUS">>)                     -> ?invalid(payment_system);
-decode_payment_system(<<"COMPROCARD">>)                 -> ?invalid(payment_system);
-decode_payment_system(<<"DANKORT">>)                    -> dankort;
-decode_payment_system(<<"DFS/DCI">>)                    -> ?invalid(payment_system);
-decode_payment_system(<<"DINACARD">>)                   -> ?invalid(payment_system);
-decode_payment_system(<<"DINERS CLUB INTERNATIONAL">>)  -> dinersclub;
-decode_payment_system(<<"DISCOVER">>)                   -> discover;
-decode_payment_system(<<"DUET">>)                       -> ?invalid(payment_system);
-decode_payment_system(<<"EBT">>)                        -> ?invalid(payment_system);
-decode_payment_system(<<"EFTPOS">>)                     -> ?invalid(payment_system);
-decode_payment_system(<<"ELO">>)                        -> ?invalid(payment_system);
-decode_payment_system(<<"ELO/DISCOVER">>)               -> ?invalid(payment_system);
-decode_payment_system(<<"EUROSHELL FUEL CARD">>)        -> ?invalid(payment_system);
-decode_payment_system(<<"FUEL CARD">>)                  -> ?invalid(payment_system);
-decode_payment_system(<<"GE CAPITAL">>)                 -> ?invalid(payment_system);
-decode_payment_system(<<"GLOBAL BC">>)                  -> ?invalid(payment_system);
-decode_payment_system(<<"HIPERCARD">>)                  -> ?invalid(payment_system);
-decode_payment_system(<<"HRG STORE CARD">>)             -> ?invalid(payment_system);
-decode_payment_system(<<"JCB">>)                        -> jcb;
-decode_payment_system(<<"LOCAL BRAND">>)                -> ?invalid(payment_system);
-decode_payment_system(<<"LOCAL CARD">>)                 -> ?invalid(payment_system);
-decode_payment_system(<<"LOYALTY CARD">>)               -> ?invalid(payment_system);
-decode_payment_system(<<"LUKOIL FUEL CARD">>)           -> ?invalid(payment_system);
-decode_payment_system(<<"MAESTRO">>)                    -> maestro;
-decode_payment_system(<<"MASTERCARD">>)                 -> mastercard;
-decode_payment_system(<<"NEWDAY">>)                     -> ?invalid(payment_system);
-decode_payment_system(<<"NSPK MIR">>)                   -> nspkmir;
-decode_payment_system(<<"OUROCARD">>)                   -> ?invalid(payment_system);
-decode_payment_system(<<"PAYPAL">>)                     -> ?invalid(payment_system);
-decode_payment_system(<<"PHH FUEL CARD">>)              -> ?invalid(payment_system);
-decode_payment_system(<<"PRIVATE LABEL">>)              -> ?invalid(payment_system);
-decode_payment_system(<<"PRIVATE LABEL CARD">>)         -> ?invalid(payment_system);
-decode_payment_system(<<"PROSTIR">>)                    -> ?invalid(payment_system);
-decode_payment_system(<<"RBS GIFT CARD">>)              -> ?invalid(payment_system);
-decode_payment_system(<<"RED FUEL CARD">>)              -> ?invalid(payment_system);
-decode_payment_system(<<"RED LIQUID FUEL CARD">>)       -> ?invalid(payment_system);
-decode_payment_system(<<"RUPAY">>)                      -> ?invalid(payment_system);
-decode_payment_system(<<"SBERCARD">>)                   -> ?invalid(payment_system);
-decode_payment_system(<<"SODEXO">>)                     -> ?invalid(payment_system);
-decode_payment_system(<<"STAR REWARDS">>)               -> ?invalid(payment_system);
-decode_payment_system(<<"TROY">>)                       -> ?invalid(payment_system);
-decode_payment_system(<<"UATP">>)                       -> ?invalid(payment_system);
-decode_payment_system(<<"UK FUEL CARD">>)               -> ?invalid(payment_system);
-decode_payment_system(<<"UNIONPAY">>)                   -> unionpay;
-decode_payment_system(<<"VISA">>)                       -> visa;
-decode_payment_system(<<"VISA/DANKORT">>)               -> visa; % supposedly 🤔
-decode_payment_system(<<"VPAY">>)                       -> ?invalid(payment_system);
+-spec decode_payment_system(binary()) -> dmsl_domain_thrift:'BankCardPaymentSystem'().
+decode_payment_system(<<"AMERICAN EXPRESS">>) ->
+    amex;
+decode_payment_system(<<"AMERICAN EXPRESS COMPANY">>) ->
+    amex;
+decode_payment_system(<<"ATM CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"ATOS PRIVATE LABEL">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"AURA">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"BANKCARD(INACTIVE)">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"BP FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"CABAL">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"CARNET">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"CHINA UNION PAY">>) ->
+    unionpay;
+decode_payment_system(<<"CHJONES FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"CIRRUS">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"COMPROCARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"DANKORT">>) ->
+    dankort;
+decode_payment_system(<<"DFS/DCI">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"DINACARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"DINERS CLUB INTERNATIONAL">>) ->
+    dinersclub;
+decode_payment_system(<<"DISCOVER">>) ->
+    discover;
+decode_payment_system(<<"DUET">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"EBT">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"EFTPOS">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"ELO">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"ELO/DISCOVER">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"EUROSHELL FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"GE CAPITAL">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"GLOBAL BC">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"HIPERCARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"HRG STORE CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"JCB">>) ->
+    jcb;
+decode_payment_system(<<"LOCAL BRAND">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"LOCAL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"LOYALTY CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"LUKOIL FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"MAESTRO">>) ->
+    maestro;
+decode_payment_system(<<"MASTERCARD">>) ->
+    mastercard;
+decode_payment_system(<<"NEWDAY">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"NSPK MIR">>) ->
+    nspkmir;
+decode_payment_system(<<"OUROCARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"PAYPAL">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"PHH FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"PRIVATE LABEL">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"PRIVATE LABEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"PROSTIR">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"RBS GIFT CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"RED FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"RED LIQUID FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"RUPAY">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"SBERCARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"SODEXO">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"STAR REWARDS">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"TROY">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"UATP">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"UK FUEL CARD">>) ->
+    ?invalid(payment_system);
+decode_payment_system(<<"UNIONPAY">>) ->
+    unionpay;
+decode_payment_system(<<"VISA">>) ->
+    visa;
+% supposedly 🤔
+decode_payment_system(<<"VISA/DANKORT">>) ->
+    visa;
+decode_payment_system(<<"VPAY">>) ->
+    ?invalid(payment_system);
 decode_payment_system(PaymentSystem) ->
     _ = logger:warning("unknown payment system encountered: ~s", [PaymentSystem]),
     ?invalid(payment_system).
 
 %% Residence mapping
 %%
--spec decode_issuer_country(binary() | undefined) ->
-    dmsl_domain_thrift:'Residence'() | undefined.
-
+-spec decode_issuer_country(binary() | undefined) -> dmsl_domain_thrift:'Residence'() | undefined.
 decode_issuer_country(Residence) when is_binary(Residence) ->
     try
         {enum, Variants} = dmsl_domain_thrift:enum_info('Residence'),
@@ -164,15 +218,12 @@ decode_issuer_country(Residence) when is_binary(Residence) ->
 decode_issuer_country(undefined) ->
     undefined.
 
--spec payment_system(bank_info()) ->
-    payment_system().
-
+-spec payment_system(bank_info()) -> payment_system().
 payment_system(BankInfo) ->
     maps:get(payment_system, BankInfo).
 
 -spec validate(cardholder_data(), extra_card_data(), session_data() | undefined, payment_system(), validation_env()) ->
     ok | {error, reason()}.
-
 validate(CardData, ExtraCardData, SessionData, PaymentSystem, Env) ->
     Rulesets = get_payment_system_assertions(),
     Assertions = maps:get(PaymentSystem, Rulesets, []),
@@ -194,7 +245,9 @@ get_cvv_from_session_data(_) ->
 %%
 
 validate_card_data(CardData, Assertions, Env) ->
-    try run_assertions(CardData, Assertions, Env) catch
+    try
+        run_assertions(CardData, Assertions, Env)
+    catch
         Reason ->
             {error, Reason}
     end.
@@ -247,13 +300,12 @@ check_luhn(<<N, Rest/binary>>, Sum) ->
 % config
 
 -type check() ::
-    {length, [pos_integer() | {range, pos_integer(), pos_integer()}]} |
-    luhn |
-    expiration.
+    {length, [pos_integer() | {range, pos_integer(), pos_integer()}]}
+    | luhn
+    | expiration.
 
 get_payment_system_assertions() ->
     #{
-
         visa => #{
             cardnumber => [{length, [13, 16]}, luhn],
             cvv => [{length, [3]}],
@@ -330,11 +382,10 @@ get_payment_system_assertions() ->
             cvv => [{length, [3]}],
             exp_date => [expiration]
         }
-
     }.
 
 convert_card_data(CardData) ->
-    #cds_PutCardData {
+    #cds_PutCardData{
         pan = PAN
     } = CardData,
     #{

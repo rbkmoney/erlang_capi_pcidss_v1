@@ -14,5 +14,5 @@ get_result(ID) ->
 get_result(ID, Context) ->
     #bender_GenerationResult{
         internal_id = ID,
-        context     = Context
-}.
+        context = Context
+    }.

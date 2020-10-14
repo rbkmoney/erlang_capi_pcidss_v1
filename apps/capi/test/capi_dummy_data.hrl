@@ -10,7 +10,7 @@
 
 -define(BINBASE_LOOKUP_RESULT, ?BINBASE_LOOKUP_RESULT(<<"MASTERCARD">>)).
 -define(BINBASE_LOOKUP_RESULT(PaymentSystem), #'binbase_ResponseData'{
-    bin_data = #'binbase_BinData' {
+    bin_data = #'binbase_BinData'{
         payment_system = PaymentSystem,
         bank_name = ?STRING,
         iso_country_code = <<"KAZ">>,
@@ -29,13 +29,15 @@
                 month = 10,
                 year = 2028
             },
-            auth_data = {auth_3ds, #paytoolprv_Auth3DS{
-                cryptogram = ?STRING,
-                eci = ?STRING
-            }}
+            auth_data =
+                {auth_3ds, #paytoolprv_Auth3DS{
+                    cryptogram = ?STRING,
+                    eci = ?STRING
+                }}
         }}
     )
 ).
+
 -define(UNWRAPPED_PAYMENT_TOOL(Details, PaymentData), #paytoolprv_UnwrappedPaymentTool{
     payment_data = PaymentData,
     card_info = #paytoolprv_CardInfo{
@@ -52,14 +54,18 @@
     bank_card = ?BANK_CARD
 }).
 
--define(APPLE_PAY_DETAILS, {apple, #paytoolprv_ApplePayDetails{
-    transaction_id = ?STRING,
-    amount = ?INTEGER,
-    currency_numeric_code = 643,
-    device_id = ?STRING
-}}).
+-define(APPLE_PAY_DETAILS,
+    {apple, #paytoolprv_ApplePayDetails{
+        transaction_id = ?STRING,
+        amount = ?INTEGER,
+        currency_numeric_code = 643,
+        device_id = ?STRING
+    }}
+).
 
--define(GOOGLE_PAY_DETAILS, {google, #paytoolprv_GooglePayDetails{
-    message_id = ?STRING,
-    message_expiration = ?TIMESTAMP
-}}).
+-define(GOOGLE_PAY_DETAILS,
+    {google, #paytoolprv_GooglePayDetails{
+        message_id = ?STRING,
+        message_expiration = ?TIMESTAMP
+    }}
+).
