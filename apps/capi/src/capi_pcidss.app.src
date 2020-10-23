@@ -22,7 +22,9 @@
         erl_health,
         uac,
         scoper,
-        cds_proto
+        cds_proto,
+        prometheus,
+        prometheus_cowboy
     ]},
     {env, []}
 ]}.
