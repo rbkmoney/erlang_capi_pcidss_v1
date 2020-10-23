@@ -12,9 +12,9 @@
 -type params() :: {cowboy_router:routes(), module()}.
 
 -spec child_spec(params()) -> supervisor:child_spec().
-child_spec({HealthRoutes, LogicHandler}) ->
+child_spec({AdditionalRoutes, LogicHandler}) ->
     {Transport, TransportOpts} = get_socket_transport(),
-    CowboyOpts = get_cowboy_config(HealthRoutes, LogicHandler),
+    CowboyOpts = get_cowboy_config(AdditionalRoutes, LogicHandler),
     ranch:child_spec(?MODULE, Transport, TransportOpts, cowboy_clear, CowboyOpts).
 
 get_socket_transport() ->
@@ -23,11 +23,11 @@ get_socket_transport() ->
     AcceptorsPool = genlib_app:env(?APP, acceptors_poolsize, ?DEFAULT_ACCEPTORS_POOLSIZE),
     {ranch_tcp, #{socket_opts => [{ip, IP}, {port, Port}], num_acceptors => AcceptorsPool}}.
 
-get_cowboy_config(HealthRoutes, LogicHandler) ->
+get_cowboy_config(AdditionalRoutes, LogicHandler) ->
     Dispatch =
         cowboy_router:compile(
             squash_routes(
-                HealthRoutes ++
+                AdditionalRoutes ++
                     swag_server_router:get_paths(LogicHandler)
             )
         ),
