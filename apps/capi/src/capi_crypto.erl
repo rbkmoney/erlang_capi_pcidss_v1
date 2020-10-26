@@ -11,9 +11,7 @@
 -export([create_encrypted_payment_tool_token/1]).
 -export([decrypt_payment_tool_token/1]).
 
--spec create_encrypted_payment_tool_token(payment_tool()) ->
-    encrypted_token().
-
+-spec create_encrypted_payment_tool_token(payment_tool()) -> encrypted_token().
 create_encrypted_payment_tool_token(PaymentTool) ->
     PaymentToolToken = encode_payment_tool_token(PaymentTool),
     ThriftType = {struct, union, {dmsl_payment_tool_token_thrift, 'PaymentToolToken'}},

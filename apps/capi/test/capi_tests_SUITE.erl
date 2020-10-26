@@ -418,7 +418,7 @@ start_capi(Config) ->
         {ip, ?CAPI_IP},
         {port, ?CAPI_PORT},
         {service_type, real},
-        {lechiffre_opts,  #{
+        {lechiffre_opts, #{
             encryption_source => JwkPublSource,
             decryption_sources => [JwkPrivSource]
         }},
