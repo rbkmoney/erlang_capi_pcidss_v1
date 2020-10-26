@@ -2,6 +2,7 @@
 %% @end
 
 -module(capi_sup).
+
 -behaviour(supervisor).
 
 %% API
@@ -13,29 +14,27 @@
 %%
 
 -spec start_link() -> {ok, pid()} | {error, {already_started, pid()}}.
-
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %%
 
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
-
 init([]) ->
     LechiffreOpts = genlib_app:env(capi_pcidss, lechiffre_opts),
     LechiffreSpec = lechiffre:child_spec(lechiffre, LechiffreOpts),
     {LogicHandler, LogicHandlerSpecs} = get_logic_handler_info(),
-    HealthRoutes = [{'_', [erl_health_handle:get_route(genlib_app:env(capi_pcidss, health_checkers, []))]}],
-    SwaggerSpec  = capi_swagger_server:child_spec({HealthRoutes, LogicHandler}),
-    UacConf      = get_uac_config(),
-    ok           = uac:configure(UacConf),
+    HealthCheck = genlib_app:env(capi_pcidss, health_checkers, []),
+    AdditionalRoutes = [{'_', [erl_health_handle:get_route(HealthCheck), get_prometheus_route()]}],
+    SwaggerSpec = capi_swagger_server:child_spec({AdditionalRoutes, LogicHandler}),
+    UacConf = get_uac_config(),
+    ok = uac:configure(UacConf),
     {ok, {
         {one_for_all, 0, 1},
-            [LechiffreSpec] ++ LogicHandlerSpecs ++ [SwaggerSpec]
+        [LechiffreSpec] ++ LogicHandlerSpecs ++ [SwaggerSpec]
     }}.
 
--spec get_logic_handler_info() -> {Handler :: atom(), [Spec :: supervisor:child_spec()] | []} .
-
+-spec get_logic_handler_info() -> {Handler :: atom(), [Spec :: supervisor:child_spec()] | []}.
 get_logic_handler_info() ->
     case genlib_app:env(capi_pcidss, service_type) of
         real ->
@@ -57,3 +56,7 @@ get_authorization_config() ->
         Config ->
             Config
     end.
+
+-spec get_prometheus_route() -> {iodata(), module(), _Opts :: any()}.
+get_prometheus_route() ->
+    {"/metrics/[:registry]", prometheus_cowboy2_handler, []}.

@@ -1,6 +1,6 @@
 -module(capi_swagger_server).
 
--export([child_spec   /1]).
+-export([child_spec/1]).
 
 -define(APP, capi_pcidss).
 -define(DEFAULT_ACCEPTORS_POOLSIZE, 100).
@@ -11,25 +11,26 @@
 
 -type params() :: {cowboy_router:routes(), module()}.
 
--spec child_spec(params()) ->
-    supervisor:child_spec().
-child_spec({HealthRoutes, LogicHandler}) ->
+-spec child_spec(params()) -> supervisor:child_spec().
+child_spec({AdditionalRoutes, LogicHandler}) ->
     {Transport, TransportOpts} = get_socket_transport(),
-    CowboyOpts = get_cowboy_config(HealthRoutes, LogicHandler),
+    CowboyOpts = get_cowboy_config(AdditionalRoutes, LogicHandler),
     ranch:child_spec(?MODULE, Transport, TransportOpts, cowboy_clear, CowboyOpts).
 
 get_socket_transport() ->
     {ok, IP} = inet:parse_address(genlib_app:env(?APP, ip, ?DEFAULT_IP_ADDR)),
-    Port     = genlib_app:env(?APP, port, ?DEFAULT_PORT),
+    Port = genlib_app:env(?APP, port, ?DEFAULT_PORT),
     AcceptorsPool = genlib_app:env(?APP, acceptors_poolsize, ?DEFAULT_ACCEPTORS_POOLSIZE),
     {ranch_tcp, #{socket_opts => [{ip, IP}, {port, Port}], num_acceptors => AcceptorsPool}}.
 
-get_cowboy_config(HealthRoutes, LogicHandler) ->
+get_cowboy_config(AdditionalRoutes, LogicHandler) ->
     Dispatch =
-        cowboy_router:compile(squash_routes(
-            HealthRoutes ++
-            swag_server_router:get_paths(LogicHandler)
-        )),
+        cowboy_router:compile(
+            squash_routes(
+                AdditionalRoutes ++
+                    swag_server_router:get_paths(LogicHandler)
+            )
+        ),
     CowboyOpts = #{
         env => #{
             dispatch => Dispatch,
@@ -41,7 +42,9 @@ get_cowboy_config(HealthRoutes, LogicHandler) ->
             cowboy_handler
         ],
         stream_handlers => [
-            cowboy_access_log_h, capi_stream_h, cowboy_stream_h
+            cowboy_access_log_h,
+            capi_stream_h,
+            cowboy_stream_h
         ]
     },
     cowboy_access_log_h:set_extra_info_fun(
@@ -50,29 +53,32 @@ get_cowboy_config(HealthRoutes, LogicHandler) ->
     ).
 
 squash_routes(Routes) ->
-    orddict:to_list(lists:foldl(
-        fun ({K, V}, D) -> orddict:update(K, fun (V0) -> V0 ++ V end, V, D) end,
-        orddict:new(),
-        Routes
-    )).
+    orddict:to_list(
+        lists:foldl(
+            fun({K, V}, D) -> orddict:update(K, fun(V0) -> V0 ++ V end, V, D) end,
+            orddict:new(),
+            Routes
+        )
+    ).
 
 mk_operation_id_getter(#{env := Env}) ->
     %% Ensure that request has host and path required for
     %% cowboy_router:execute/2.
     %% NOTE: Be careful when upgrade cowboy in this project
     %% because cowboy_router:execute/2 call can change.
-    fun (Req=#{host := _Host, path := _Path}) ->
-        case cowboy_router:execute(Req, Env) of
-            {ok, _, #{handler_opts := {_Operations, _LogicHandler, _SwaggerHandlerOpts} = HandlerOpts}} ->
-                case swag_server_utils:get_operation_id(Req, HandlerOpts) of
-                    undefined ->
-                        #{};
-                    OperationID ->
-                        #{operation_id => OperationID}
-                end;
-            _ ->
-                #{}
-        end;
+    fun
+        (Req = #{host := _Host, path := _Path}) ->
+            case cowboy_router:execute(Req, Env) of
+                {ok, _, #{handler_opts := {_Operations, _LogicHandler, _SwaggerHandlerOpts} = HandlerOpts}} ->
+                    case swag_server_utils:get_operation_id(Req, HandlerOpts) of
+                        undefined ->
+                            #{};
+                        OperationID ->
+                            #{operation_id => OperationID}
+                    end;
+                _ ->
+                    #{}
+            end;
         (_Req) ->
             #{}
     end.
