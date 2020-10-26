@@ -140,7 +140,7 @@ process_request('CreatePaymentResource' = OperationID, Req, Context, ReqCtx) ->
             payment_session_id = PaymentSessionID,
             client_info = encode_client_info(ClientInfo)
         },
-        EncryptedToken = capi_crypto:create_encrypted_payment_tool_token(IdempotentKey, PaymentTool),
+        EncryptedToken = capi_crypto:create_encrypted_payment_tool_token(PaymentTool),
         {ok, {201, #{}, decode_disposable_payment_resource(PaymentResource, EncryptedToken)}}
     catch
         Result ->
