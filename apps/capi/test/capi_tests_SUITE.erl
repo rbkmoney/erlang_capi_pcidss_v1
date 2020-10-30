@@ -63,7 +63,8 @@ init([]) ->
 -spec all() -> [test_case_name()].
 all() ->
     [
-        {group, payment_resources}
+        {group, payment_resources},
+        {group, payment_tool_token_support}
     ].
 
 -spec groups() -> [{group_name(), list(), [test_case_name()]}].
@@ -78,7 +79,9 @@ groups() ->
             create_crypto_payment_resource_ok_test,
             create_applepay_tokenized_payment_resource_ok_test,
             create_googlepay_tokenized_payment_resource_ok_test,
-            create_googlepay_plain_payment_resource_ok_test,
+            create_googlepay_plain_payment_resource_ok_test
+        ]},
+        {payment_tool_token_support, [], [
             valid_until_payment_resource_test,
             check_support_decrypt_v1_test,
             check_support_decrypt_v2_test
@@ -111,29 +114,15 @@ init_per_group(payment_resources, Config) ->
     Token = capi_ct_helper:issue_token(BasePermissions, unlimited),
     Context = get_context(Token),
     [{context, Context} | Config];
+init_per_group(payment_tool_token_support, Config) ->
+    Save = application:get_env(capi_pcidss, payment_tool_token_lifetime, undefined),
+    application:set_env(capi_pcidss, payment_tool_token_lifetime, ?PAYMENT_TOOL_TOKEN_LIFETIME),
+    init_per_group(payment_resources, [{payment_tool_token_lifetime, Save} | Config]);
 init_per_group(_, Config) ->
     Config.
 
 -spec end_per_group(group_name(), config()) -> _.
-end_per_group(_Group, _C) ->
-    ok.
-
--spec init_per_testcase(test_case_name(), config()) -> config().
-init_per_testcase(Name, C) ->
-    C1 =
-        case Name of
-            valid_until_payment_resource_test ->
-                Save = application:get_env(capi_pcidss, payment_tool_token_lifetime, undefined),
-                application:set_env(capi_pcidss, payment_tool_token_lifetime, ?PAYMENT_TOOL_TOKEN_LIFETIME),
-                lists:keystore(payment_tool_token_lifetime, 1, C, {payment_tool_token_lifetime, Save});
-            _ ->
-                C
-        end,
-    [{test_sup, start_mocked_service_sup()} | C1].
-
--spec end_per_testcase(test_case_name(), config()) -> config().
-end_per_testcase(_Name, C) ->
-    stop_mocked_service_sup(?config(test_sup, C)),
+end_per_group(_Group, C) ->
     case lists:keysearch(payment_tool_token_lifetime, 1, C) of
         {value, {_, undefined}} ->
             application:unset_env(capi_pcidss, payment_tool_token_lifetime);
@@ -142,6 +131,15 @@ end_per_testcase(_Name, C) ->
         _ ->
             ok
     end.
+
+-spec init_per_testcase(test_case_name(), config()) -> config().
+init_per_testcase(_Name, C) ->
+    [{test_sup, start_mocked_service_sup()} | C].
+
+-spec end_per_testcase(test_case_name(), config()) -> config().
+end_per_testcase(_Name, C) ->
+    stop_mocked_service_sup(?config(test_sup, C)),
+    ok.
 
 %%% Tests
 
