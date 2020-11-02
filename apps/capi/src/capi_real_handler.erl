@@ -30,7 +30,7 @@
 -define(DEFAULT_INVOICE_TPL_META, #{}).
 % seconds
 -define(DEFAULT_URL_LIFETIME, 60).
--define(DEFAULT_PAYMENT_TOOL_TOKEN_LIFETIME, undefined).
+-define(DEFAULT_PAYMENT_TOOL_TOKEN_LIFETIME, <<"64m">>).
 
 -define(payment_institution_ref(PaymentInstitutionID), #domain_PaymentInstitutionRef{id = PaymentInstitutionID}).
 
