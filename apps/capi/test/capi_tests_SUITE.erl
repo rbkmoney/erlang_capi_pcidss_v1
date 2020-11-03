@@ -416,9 +416,6 @@ create_googlepay_plain_payment_resource_ok_test(Config) ->
 
 -spec valid_until_payment_resource_test(_) -> _.
 valid_until_payment_resource_test(Config) ->
-    {ok, TokenLifetimeBin} = application:get_env(capi_pcidss, payment_tool_token_lifetime),
-    {ok, TokenLifetime} = capi_utils:parse_lifetime(TokenLifetimeBin),
-    DeadlineBefor = capi_utils:deadline_from_timeout(TokenLifetime),
     {ok, #{
         <<"paymentToolToken">> := PaymentToolToken,
         <<"validUntil">> := ValidUntil
@@ -432,11 +429,8 @@ valid_until_payment_resource_test(Config) ->
                 <<"test fingerprint">>
         }
     }),
-    DeadlineAfter = capi_utils:deadline_from_timeout(TokenLifetime),
     {ok, {_PaymentTool, DeadlineToken}} = capi_crypto:decrypt_payment_tool_token(PaymentToolToken),
     Deadline = capi_utils:deadline_from_binary(ValidUntil),
-    ?assertEqual(true, DeadlineBefor < Deadline),
-    ?assertEqual(true, Deadline < DeadlineAfter),
     ?assertEqual(Deadline, DeadlineToken).
 
 -spec check_support_decrypt_v2_test(config()) -> _.
