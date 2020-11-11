@@ -1,6 +1,7 @@
 -module(capi_tests_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("damsel/include/dmsl_accounter_thrift.hrl").
@@ -35,7 +36,9 @@
     create_crypto_payment_resource_ok_test/1,
     create_applepay_tokenized_payment_resource_ok_test/1,
     create_googlepay_tokenized_payment_resource_ok_test/1,
-    create_googlepay_plain_payment_resource_ok_test/1
+    create_googlepay_plain_payment_resource_ok_test/1,
+    valid_until_payment_resource_test/1,
+    check_support_decrypt_v2_test/1
 ]).
 
 -define(CAPI_IP, "::").
@@ -73,7 +76,9 @@ groups() ->
             create_crypto_payment_resource_ok_test,
             create_applepay_tokenized_payment_resource_ok_test,
             create_googlepay_tokenized_payment_resource_ok_test,
-            create_googlepay_plain_payment_resource_ok_test
+            create_googlepay_plain_payment_resource_ok_test,
+            valid_until_payment_resource_test,
+            check_support_decrypt_v2_test
         ]}
     ].
 
@@ -170,8 +175,8 @@ create_visa_payment_resource_ok_test(Config) ->
         },
         <<"clientInfo">> => ClientInfo
     }),
-    {ok, {bank_card, BankCard}} = capi_crypto:decrypt_payment_tool_token(PaymentToolToken),
-    CardHolder = BankCard#domain_BankCard.cardholder_name.
+    {ok, {{bank_card, BankCard}, _ValidUntil}} = capi_crypto:decrypt_payment_tool_token(PaymentToolToken),
+    ?assertEqual(CardHolder, BankCard#domain_BankCard.cardholder_name).
 
 -spec expiration_date_fail_test(_) -> _.
 expiration_date_fail_test(Config) ->
@@ -409,6 +414,47 @@ create_googlepay_plain_payment_resource_ok_test(Config) ->
         }),
     false = maps:is_key(<<"tokenProvider">>, Details).
 
+-spec valid_until_payment_resource_test(_) -> _.
+valid_until_payment_resource_test(Config) ->
+    {ok, #{
+        <<"paymentToolToken">> := PaymentToolToken,
+        <<"validUntil">> := ValidUntil
+    }} = capi_client_tokens:create_payment_resource(?config(context, Config), #{
+        <<"paymentTool">> => #{
+            <<"paymentToolType">> => <<"CryptoWalletData">>,
+            <<"cryptoCurrency">> => <<"bitcoinCash">>
+        },
+        <<"clientInfo">> => #{
+            <<"fingerprint">> =>
+                <<"test fingerprint">>
+        }
+    }),
+    {ok, {_PaymentTool, DeadlineToken}} = capi_crypto:decrypt_payment_tool_token(PaymentToolToken),
+    Deadline = capi_utils:deadline_from_binary(ValidUntil),
+    ?assertEqual(Deadline, DeadlineToken).
+
+-spec check_support_decrypt_v2_test(config()) -> _.
+check_support_decrypt_v2_test(_Config) ->
+    PaymentToolToken = <<
+        "v2.eyJhbGciOiJFQ0RILUVTIiwiZW5jIjoiQTEyOEdDTSIsImVwayI6eyJhbGciOiJFQ0RILUVTIiwiY3J2IjoiUC0yNTYiLCJrdHkiOi"
+        "JFQyIsInVzZSI6ImVuYyIsIngiOiJRanFmNFVrOTJGNzd3WXlEUjNqY3NwR2dpYnJfdVRmSXpMUVplNzVQb1R3IiwieSI6InA5cjJGV3F"
+        "mU2xBTFJXYWhUSk8xY3VneVZJUXVvdzRwMGdHNzFKMFJkUVEifSwia2lkIjoia3hkRDBvclZQR29BeFdycUFNVGVRMFU1TVJvSzQ3dVp4"
+        "V2lTSmRnbzB0MCJ9..j3zEyCqyfQjpEtQM.JAc3kqJm6zbn0fMZGlK_t14Yt4PvgOuoVL2DtkEgIXIqrxxWFbykKBGxQvwYisJYIUJJwt"
+        "YbwvuGEODcK2uTC2quPD2Ejew66DLJF2xcAwE.MNVimzi8r-5uTATNalgoBQ"
+    >>,
+    {ok, {PaymentTool, ValidUntil}} = capi_crypto:decrypt_payment_tool_token(PaymentToolToken),
+    ?assertEqual(
+        {mobile_commerce, #domain_MobileCommerce{
+            phone = #domain_MobilePhone{
+                cc = <<"7">>,
+                ctn = <<"9210001122">>
+            },
+            operator = megafone
+        }},
+        PaymentTool
+    ),
+    ?assertEqual(<<"2020-10-29T23:44:15.499Z">>, capi_utils:deadline_to_binary(ValidUntil)).
+
 %%
 
 start_capi(Config) ->
@@ -437,7 +483,8 @@ start_capi(Config) ->
                     payment_resources => #{}
                 }
             }
-        }}
+        }},
+        {payment_tool_token_lifetime, <<"1024s">>}
     ],
     capi_ct_helper:start_app(capi_pcidss, CapiEnv).
 
