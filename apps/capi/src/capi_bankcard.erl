@@ -228,7 +228,7 @@ payment_system(BankInfo) ->
     ok | {error, reason()}.
 validate(CardData, ExtraCardData, SessionData, PaymentSystem, Env) ->
     Rulesets = get_payment_system_assertions(),
-    Assertions = maps:get(PaymentSystem, Rulesets, []),
+    Assertions = maps:get(PaymentSystem, Rulesets, #{}),
     validate_card_data(merge_data(CardData, ExtraCardData, SessionData), Assertions, Env).
 
 merge_data(CardData, ExtraCardData, undefined) ->
