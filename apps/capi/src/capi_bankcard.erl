@@ -193,6 +193,8 @@ decode_payment_system(<<"UNIONPAY">>) ->
     unionpay;
 decode_payment_system(<<"VISA">>) ->
     visa;
+decode_payment_system(<<"DUMMY">>) ->
+    dummy;
 % supposedly 🤔
 decode_payment_system(<<"VISA/DANKORT">>) ->
     visa;
