@@ -32,7 +32,7 @@
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.8.0">>},1},
  {<<"damsel">>,
   {git,"git@github.com:rbkmoney/damsel.git",
-       {ref,"a6c9401d85b856df783ed715f70304e7e104f052"}},
+       {ref,"0d7c67e62ae3a7a70e39fdc47fb75f4a67792369"}},
   0},
  {<<"email_validator">>,
   {git,"https://github.com/rbkmoney/email_validator.git",

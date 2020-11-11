@@ -30,6 +30,7 @@
 -define(DEFAULT_INVOICE_TPL_META, #{}).
 % seconds
 -define(DEFAULT_URL_LIFETIME, 60).
+-define(DEFAULT_PAYMENT_TOOL_TOKEN_LIFETIME, <<"64m">>).
 
 -define(payment_institution_ref(PaymentInstitutionID), #domain_PaymentInstitutionRef{id = PaymentInstitutionID}).
 
@@ -140,11 +141,26 @@ process_request('CreatePaymentResource' = OperationID, Req, Context, ReqCtx) ->
             payment_session_id = PaymentSessionID,
             client_info = encode_client_info(ClientInfo)
         },
-        EncryptedToken = capi_crypto:create_encrypted_payment_tool_token(PaymentTool),
-        {ok, {201, #{}, decode_disposable_payment_resource(PaymentResource, EncryptedToken)}}
+        TokenValidUntil = capi_utils:deadline_from_timeout(payment_tool_token_lifetime()),
+        EncryptedToken = capi_crypto:create_encrypted_payment_tool_token(PaymentTool, TokenValidUntil),
+        {ok, {201, #{}, decode_disposable_payment_resource(PaymentResource, EncryptedToken, TokenValidUntil)}}
     catch
         Result ->
             Result
+    end.
+
+-spec payment_tool_token_lifetime() -> timeout().
+payment_tool_token_lifetime() ->
+    case genlib_app:env(capi_pcidss, payment_tool_token_lifetime, ?DEFAULT_PAYMENT_TOOL_TOKEN_LIFETIME) of
+        Value when is_integer(Value) ->
+            Value;
+        Value ->
+            case capi_utils:parse_lifetime(Value) of
+                {ok, Lifetime} ->
+                    Lifetime;
+                Error ->
+                    erlang:error(Error, [Value])
+            end
     end.
 
 %%%
@@ -567,19 +583,25 @@ process_put_card_data_result(
         SessionID
     }.
 
-decode_disposable_payment_resource(PaymentResource, EncryptedToken) ->
+decode_disposable_payment_resource(PaymentResource, EncryptedToken, TokenValidUntil) ->
     #domain_DisposablePaymentResource{
         payment_tool = PaymentTool,
         payment_session_id = PaymentSessionID,
         client_info = ClientInfo0
     } = PaymentResource,
     ClientInfo = decode_client_info(ClientInfo0),
-    #{
+    genlib_map:compact(#{
         <<"paymentToolToken">> => EncryptedToken,
         <<"paymentSession">> => wrap_payment_session(ClientInfo, PaymentSessionID),
         <<"paymentToolDetails">> => decode_payment_tool_details(PaymentTool),
-        <<"clientInfo">> => ClientInfo
-    }.
+        <<"clientInfo">> => ClientInfo,
+        <<"validUntil">> => decode_deadline(TokenValidUntil)
+    }).
+
+decode_deadline(undefined) ->
+    undefined;
+decode_deadline(Deadline) ->
+    capi_utils:deadline_to_binary(Deadline).
 
 merge_and_compact(M1, M2) ->
     genlib_map:compact(maps:merge(M1, M2)).
