@@ -193,6 +193,8 @@ decode_payment_system(<<"UNIONPAY">>) ->
     unionpay;
 decode_payment_system(<<"VISA">>) ->
     visa;
+decode_payment_system(<<"DUMMY">>) ->
+    dummy;
 % supposedly 🤔
 decode_payment_system(<<"VISA/DANKORT">>) ->
     visa;
@@ -226,7 +228,7 @@ payment_system(BankInfo) ->
     ok | {error, reason()}.
 validate(CardData, ExtraCardData, SessionData, PaymentSystem, Env) ->
     Rulesets = get_payment_system_assertions(),
-    Assertions = maps:get(PaymentSystem, Rulesets, []),
+    Assertions = maps:get(PaymentSystem, Rulesets, #{}),
     validate_card_data(merge_data(CardData, ExtraCardData, SessionData), Assertions, Env).
 
 merge_data(CardData, ExtraCardData, undefined) ->
