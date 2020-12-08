@@ -37,6 +37,8 @@
     create_applepay_tokenized_payment_resource_ok_test/1,
     create_googlepay_tokenized_payment_resource_ok_test/1,
     create_googlepay_plain_payment_resource_ok_test/1,
+    create_yandexpay_tokenized_payment_resource_ok_test/1,
+    create_yandexpay_plain_payment_resource_ok_test/1,
     valid_until_payment_resource_test/1,
     check_support_decrypt_v2_test/1
 ]).
@@ -77,6 +79,8 @@ groups() ->
             create_applepay_tokenized_payment_resource_ok_test,
             create_googlepay_tokenized_payment_resource_ok_test,
             create_googlepay_plain_payment_resource_ok_test,
+            create_yandexpay_tokenized_payment_resource_ok_test,
+            create_yandexpay_plain_payment_resource_ok_test,
             valid_until_payment_resource_test,
             check_support_decrypt_v2_test
         ]}
@@ -407,6 +411,75 @@ create_googlepay_plain_payment_resource_ok_test(Config) ->
             <<"paymentTool">> => #{
                 <<"paymentToolType">> => <<"TokenizedCardData">>,
                 <<"provider">> => <<"GooglePay">>,
+                <<"gatewayMerchantID">> => <<"SomeMerchantID">>,
+                <<"paymentToken">> => #{}
+            },
+            <<"clientInfo">> => ClientInfo
+        }),
+    false = maps:is_key(<<"tokenProvider">>, Details).
+
+-spec create_yandexpay_tokenized_payment_resource_ok_test(_) -> _.
+create_yandexpay_tokenized_payment_resource_ok_test(Config) ->
+    mock_services(
+        [
+            {payment_tool_provider_yandex_pay, fun('Unwrap', _) ->
+                {ok, ?UNWRAPPED_PAYMENT_TOOL(?YANDEX_PAY_DETAILS)}
+            end},
+            {cds_storage, fun
+                ('PutSession', _) -> {ok, ok};
+                ('PutCard', _) -> {ok, ?PUT_CARD_RESULT}
+            end},
+            {bender, fun('GenerateID', _) -> {ok, capi_ct_helper_bender:get_result(<<"bender_key">>)} end},
+            {binbase, fun('Lookup', _) -> {ok, ?BINBASE_LOOKUP_RESULT} end}
+        ],
+        Config
+    ),
+    ClientInfo = #{<<"fingerprint">> => <<"test fingerprint">>},
+    {ok, #{
+        <<"paymentToolDetails">> := #{
+            <<"paymentSystem">> := <<"mastercard">>,
+            <<"tokenProvider">> := <<"yandexpay">>
+        }
+    }} =
+        capi_client_tokens:create_payment_resource(?config(context, Config), #{
+            <<"paymentTool">> => #{
+                <<"paymentToolType">> => <<"TokenizedCardData">>,
+                <<"provider">> => <<"YandexPay">>,
+                <<"gatewayMerchantID">> => <<"SomeMerchantID">>,
+                <<"paymentToken">> => #{}
+            },
+            <<"clientInfo">> => ClientInfo
+        }).
+
+-spec create_yandexpay_plain_payment_resource_ok_test(_) -> _.
+create_yandexpay_plain_payment_resource_ok_test(Config) ->
+    mock_services(
+        [
+            {payment_tool_provider_yandex_pay, fun('Unwrap', _) ->
+                {ok,
+                    ?UNWRAPPED_PAYMENT_TOOL(
+                        ?YANDEX_PAY_DETAILS,
+                        {card, #paytoolprv_Card{
+                            pan = <<"5321301234567892">>,
+                            exp_date = #paytoolprv_ExpDate{month = 10, year = 2028}
+                        }}
+                    )}
+            end},
+            {cds_storage, fun
+                ('PutSession', _) -> {ok, ok};
+                ('PutCard', _) -> {ok, ?PUT_CARD_RESULT}
+            end},
+            {bender, fun('GenerateID', _) -> {ok, capi_ct_helper_bender:get_result(<<"bender_key">>)} end},
+            {binbase, fun('Lookup', _) -> {ok, ?BINBASE_LOOKUP_RESULT} end}
+        ],
+        Config
+    ),
+    ClientInfo = #{<<"fingerprint">> => <<"test fingerprint">>},
+    {ok, #{<<"paymentToolDetails">> := Details = #{<<"paymentSystem">> := <<"mastercard">>}}} =
+        capi_client_tokens:create_payment_resource(?config(context, Config), #{
+            <<"paymentTool">> => #{
+                <<"paymentToolType">> => <<"TokenizedCardData">>,
+                <<"provider">> => <<"YandexPay">>,
                 <<"gatewayMerchantID">> => <<"SomeMerchantID">>,
                 <<"paymentToken">> => #{}
             },
