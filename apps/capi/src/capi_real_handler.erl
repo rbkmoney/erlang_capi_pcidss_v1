@@ -551,6 +551,11 @@ encode_payment_request(#{<<"provider">> := <<"SamsungPay">>} = Data) ->
     {samsung, #paytoolprv_SamsungPayRequest{
         service_id = genlib_map:get(<<"serviceID">>, Data),
         reference_id = genlib_map:get(<<"referenceID">>, Data)
+    }};
+encode_payment_request(#{<<"provider">> := <<"YandexPay">>} = Data) ->
+    {yandex, #paytoolprv_YandexPayRequest{
+        gateway_merchant_id = maps:get(<<"gatewayMerchantID">>, Data),
+        payment_token = encode_content(json, maps:get(<<"paymentToken">>, Data))
     }}.
 
 get_token_provider_service_name(Data) ->
@@ -560,7 +565,9 @@ get_token_provider_service_name(Data) ->
         #{<<"provider">> := <<"GooglePay">>} ->
             payment_tool_provider_google_pay;
         #{<<"provider">> := <<"SamsungPay">>} ->
-            payment_tool_provider_samsung_pay
+            payment_tool_provider_samsung_pay;
+        #{<<"provider">> := <<"YandexPay">>} ->
+            payment_tool_provider_yandex_pay
     end.
 
 process_put_card_data_result(
@@ -617,7 +624,9 @@ get_payment_token_provider({apple, _}, _PaymentData) ->
 get_payment_token_provider({google, _}, _PaymentData) ->
     googlepay;
 get_payment_token_provider({samsung, _}, _PaymentData) ->
-    samsungpay.
+    samsungpay;
+get_payment_token_provider({yandex, _}, _PaymentData) ->
+    yandexpay.
 
 wrap_payment_session(ClientInfo, PaymentSession) ->
     capi_utils:map_to_base64url(#{
