@@ -49,7 +49,9 @@ to_universal_time(Timestamp) ->
     Microsecs = genlib_rfc3339:parse(Timestamp, microsecond),
     genlib_rfc3339:format_relaxed(Microsecs, microsecond).
 
--spec parse_lifetime(binary()) -> {ok, timeout()} | {error, bad_lifetime}.
+-spec parse_lifetime
+    (undefined) -> {error, bad_lifetime};
+    (binary()) -> {ok, timeout()} | {error, bad_lifetime}.
 parse_lifetime(undefined) ->
     {error, bad_lifetime};
 parse_lifetime(Bin) ->

@@ -55,7 +55,7 @@ generate_id(Key, BenderSchema, Hash, WoodyCtx) ->
         <<"version">> => ?SCHEMA_VER1,
         <<"params_hash">> => Hash
     }),
-    Args = [Key, BenderSchema, Context],
+    Args = {Key, BenderSchema, Context},
     Result =
         case capi_woody_client:call_service(bender, 'GenerateID', Args, WoodyCtx) of
             {ok, #bender_GenerationResult{internal_id = InternalID, context = undefined}} ->

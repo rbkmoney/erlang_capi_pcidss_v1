@@ -17,10 +17,10 @@ SERVICE_IMAGE_PUSH_TAG ?= $(SERVICE_IMAGE_TAG)
 
 # Base image for the service
 BASE_IMAGE_NAME := service-erlang
-BASE_IMAGE_TAG := 54a794b4875ad79f90dba0a7708190b3b37d584f
+BASE_IMAGE_TAG := b2c2a3f8c46842488eef78a2574ba880eeff07b9
 
 BUILD_IMAGE_NAME := build-erlang
-BUILD_IMAGE_TAG := 12beabfb5b6968c7566fa3d872ad1b3e8d612f46
+BUILD_IMAGE_TAG := 1333d0926b203e00c47e4fad7e10d2252a020305
 
 CALL_ANYWHERE := \
 	submodules \
@@ -64,7 +64,7 @@ format:
 	$(REBAR) fmt -w
 
 dialyze:
-	$(REBAR) dialyzer
+	$(REBAR) as test dialyzer
 
 start: submodules
 	$(REBAR) run

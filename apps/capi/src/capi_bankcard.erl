@@ -51,7 +51,7 @@ validation_env() ->
 -spec lookup_bank_info(_PAN :: binary(), woody_context:ctx()) -> {ok, bank_info()} | {error, lookup_error()}.
 lookup_bank_info(PAN, WoodyCtx) ->
     RequestVersion = {'last', #binbase_Last{}},
-    case capi_woody_client:call_service(binbase, 'Lookup', [PAN, RequestVersion], WoodyCtx) of
+    case capi_woody_client:call_service(binbase, 'Lookup', {PAN, RequestVersion}, WoodyCtx) of
         {ok, BinData} ->
             decode_bank_info(BinData);
         {exception, #'binbase_BinNotFound'{}} ->
