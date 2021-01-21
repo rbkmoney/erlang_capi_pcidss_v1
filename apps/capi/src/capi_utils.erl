@@ -38,11 +38,12 @@ deadline_is_reached(Deadline) ->
 
 -spec base64url_to_map(binary()) -> map() | no_return().
 base64url_to_map(Base64) when is_binary(Base64) ->
-    jsx:decode(base64url:decode(Base64), [return_maps]).
+    {ok, Json} = jose_base64url:decode(Base64),
+    jsx:decode(Json, [return_maps]).
 
 -spec map_to_base64url(map()) -> binary() | no_return().
 map_to_base64url(Map) when is_map(Map) ->
-    base64url:encode(jsx:encode(Map)).
+    jose_base64url:encode(jsx:encode(Map)).
 
 -spec to_universal_time(Timestamp :: binary()) -> TimestampUTC :: binary().
 to_universal_time(Timestamp) ->
