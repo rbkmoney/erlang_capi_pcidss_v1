@@ -79,7 +79,7 @@
   1},
  {<<"parse_trans">>,
   {git,"https://github.com/uwiger/parse_trans.git",
-       {ref,"2e762d16ab58ee70446bd66fce14bb36e3e537d6"}},
+       {ref,"8ba366f81789c913cd63d69c6d1da948c200d18a"}},
   0},
  {<<"payproc_errors">>,
   {git,"git@github.com:rbkmoney/payproc-errors-erlang.git",
