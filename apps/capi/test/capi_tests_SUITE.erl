@@ -59,7 +59,7 @@
 init([]) ->
     {ok, {#{strategy => one_for_all, intensity => 1, period => 1}, []}}.
 
--spec all() -> [test_case_name()].
+-spec all() -> [{group, test_case_name()}].
 all() ->
     [
         {group, payment_resources}
@@ -99,7 +99,7 @@ init_per_suite(Config) ->
 -spec end_per_suite(config()) -> _.
 end_per_suite(C) ->
     _ = stop_mocked_service_sup(?config(suite_test_sup, C)),
-    [application:stop(App) || App <- proplists:get_value(apps, C)],
+    _ = [application:stop(App) || App <- proplists:get_value(apps, C)],
     ok.
 
 -spec init_per_group(group_name(), config()) -> config().
@@ -121,7 +121,7 @@ end_per_group(_Group, _C) ->
 init_per_testcase(_Name, C) ->
     [{test_sup, start_mocked_service_sup()} | C].
 
--spec end_per_testcase(test_case_name(), config()) -> config().
+-spec end_per_testcase(test_case_name(), config()) -> _.
 end_per_testcase(_Name, C) ->
     stop_mocked_service_sup(?config(test_sup, C)),
     ok.
@@ -130,17 +130,12 @@ end_per_testcase(_Name, C) ->
 
 -spec create_visa_payment_resource_ok_test(_) -> _.
 create_visa_payment_resource_ok_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {cds_storage, fun
                 ('PutSession', _) ->
                     {ok, ok};
-                (
-                    'PutCard',
-                    [
-                        #'cds_PutCardData'{pan = <<"411111", _:6/binary, Mask:4/binary>>}
-                    ]
-                ) ->
+                ('PutCard', {#'cds_PutCardData'{pan = <<"411111", _:6/binary, Mask:4/binary>>}}) ->
                     {ok, #'cds_PutCardResult'{
                         bank_card = #cds_BankCard{
                             token = ?STRING,
@@ -150,9 +145,7 @@ create_visa_payment_resource_ok_test(Config) ->
                     }}
             end},
             {bender, fun('GenerateID', _) -> {ok, capi_ct_helper_bender:get_result(<<"bender_key">>)} end},
-            {binbase, fun('Lookup', _) ->
-                {ok, ?BINBASE_LOOKUP_RESULT(<<"VISA">>)}
-            end}
+            {binbase, fun('Lookup', _) -> {ok, ?BINBASE_LOOKUP_RESULT(<<"VISA">>)} end}
         ],
         Config
     ),
@@ -182,17 +175,12 @@ create_visa_payment_resource_ok_test(Config) ->
 
 -spec expiration_date_fail_test(_) -> _.
 expiration_date_fail_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {cds_storage, fun
                 ('PutSession', _) ->
                     {ok, ok};
-                (
-                    'PutCard',
-                    [
-                        #'cds_PutCardData'{pan = <<"411111", _:6/binary, Mask:4/binary>>}
-                    ]
-                ) ->
+                ('PutCard', {#'cds_PutCardData'{pan = <<"411111", _:6/binary, Mask:4/binary>>}}) ->
                     {ok, #'cds_PutCardResult'{
                         bank_card = #cds_BankCard{
                             token = ?STRING,
@@ -225,17 +213,12 @@ expiration_date_fail_test(Config) ->
 
 -spec create_nspkmir_payment_resource_ok_test(_) -> _.
 create_nspkmir_payment_resource_ok_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {cds_storage, fun
                 ('PutSession', _) ->
                     {ok, ok};
-                (
-                    'PutCard',
-                    [
-                        #'cds_PutCardData'{pan = <<"22022002", _:6/binary, Mask:2/binary>>}
-                    ]
-                ) ->
+                ('PutCard', {#'cds_PutCardData'{pan = <<"22022002", _:6/binary, Mask:2/binary>>}}) ->
                     {ok, #'cds_PutCardResult'{
                         bank_card = #cds_BankCard{
                             token = ?STRING,
@@ -321,7 +304,7 @@ create_crypto_payment_resource_ok_test(Config) ->
 
 -spec create_applepay_tokenized_payment_resource_ok_test(_) -> _.
 create_applepay_tokenized_payment_resource_ok_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {payment_tool_provider_apple_pay, fun('Unwrap', _) ->
                 {ok, ?UNWRAPPED_PAYMENT_TOOL(?APPLE_PAY_DETAILS)}
@@ -349,7 +332,7 @@ create_applepay_tokenized_payment_resource_ok_test(Config) ->
 
 -spec create_googlepay_tokenized_payment_resource_ok_test(_) -> _.
 create_googlepay_tokenized_payment_resource_ok_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {payment_tool_provider_google_pay, fun('Unwrap', _) ->
                 {ok, ?UNWRAPPED_PAYMENT_TOOL(?GOOGLE_PAY_DETAILS)}
@@ -382,7 +365,7 @@ create_googlepay_tokenized_payment_resource_ok_test(Config) ->
 
 -spec create_googlepay_plain_payment_resource_ok_test(_) -> _.
 create_googlepay_plain_payment_resource_ok_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {payment_tool_provider_google_pay, fun('Unwrap', _) ->
                 {ok,
@@ -418,7 +401,7 @@ create_googlepay_plain_payment_resource_ok_test(Config) ->
 
 -spec create_yandexpay_tokenized_payment_resource_ok_test(_) -> _.
 create_yandexpay_tokenized_payment_resource_ok_test(Config) ->
-    mock_services(
+    _ = mock_services(
         [
             {payment_tool_provider_yandex_pay, fun('Unwrap', _) ->
                 {ok, ?UNWRAPPED_PAYMENT_TOOL(?YANDEX_PAY_DETAILS)}

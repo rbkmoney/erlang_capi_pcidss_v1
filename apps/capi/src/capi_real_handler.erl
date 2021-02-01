@@ -324,7 +324,7 @@ process_card_data(Data, IdempotentKey, ReqCtx) ->
     end.
 
 put_card_to_cds(PutCardData, ExtraCardData, BankInfo, ReqCtx) ->
-    case service_call(cds_storage, 'PutCard', [PutCardData], ReqCtx) of
+    case service_call(cds_storage, 'PutCard', {PutCardData}, ReqCtx) of
         {ok, #cds_PutCardResult{bank_card = BankCard}} ->
             {bank_card, expand_card_info(BankCard, BankInfo, ExtraCardData)};
         {exception, #cds_InvalidCardData{}} ->
@@ -332,7 +332,7 @@ put_card_to_cds(PutCardData, ExtraCardData, BankInfo, ReqCtx) ->
     end.
 
 put_session_to_cds(SessionID, SessionData, ReqCtx) ->
-    {ok, ok} = service_call(cds_storage, 'PutSession', [SessionID, SessionData], ReqCtx),
+    {ok, ok} = service_call(cds_storage, 'PutSession', {SessionID, SessionData}, ReqCtx),
     ok.
 
 put_card_data_to_cds(PutCardData, ExtraCardData, SessionData, IdempotentKey, BankInfo, ReqCtx) ->
@@ -421,7 +421,7 @@ process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
     CallResult = service_call(
         get_token_provider_service_name(Data),
         'Unwrap',
-        [encode_wrapped_payment_tool(Data)],
+        {encode_wrapped_payment_tool(Data)},
         ReqCtx
     ),
     UnwrappedPaymentTool =
