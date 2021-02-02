@@ -1,13 +1,7 @@
 -module(capi_real_handler).
 
--include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("damsel/include/dmsl_domain_thrift.hrl").
 -include_lib("cds_proto/include/cds_proto_storage_thrift.hrl").
--include_lib("damsel/include/dmsl_merch_stat_thrift.hrl").
--include_lib("damsel/include/dmsl_webhooker_thrift.hrl").
--include_lib("damsel/include/dmsl_user_interaction_thrift.hrl").
--include_lib("damsel/include/dmsl_geo_ip_thrift.hrl").
--include_lib("damsel/include/dmsl_reporting_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_tool_provider_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_tool_token_thrift.hrl").
 
