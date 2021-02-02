@@ -1,4 +1,4 @@
-{application, capi_pcidss , [
+{application, capi_pcidss, [
     {description, "A service that does something securely"},
     {vsn, "0.1.0"},
     {registered, []},
@@ -22,6 +22,8 @@
         uac,
         scoper,
         cds_proto,
+        bouncer_proto,
+        bouncer_client,
         prometheus,
         prometheus_cowboy
     ]},
