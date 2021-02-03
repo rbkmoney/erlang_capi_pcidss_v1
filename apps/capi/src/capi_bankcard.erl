@@ -200,6 +200,8 @@ decode_payment_system(<<"VISA/DANKORT">>) ->
     visa;
 decode_payment_system(<<"VPAY">>) ->
     ?invalid(payment_system);
+decode_payment_system(<<"UZCARD">>) ->
+    uzcard;
 decode_payment_system(PaymentSystem) ->
     _ = logger:warning("unknown payment system encountered: ~s", [PaymentSystem]),
     ?invalid(payment_system).
