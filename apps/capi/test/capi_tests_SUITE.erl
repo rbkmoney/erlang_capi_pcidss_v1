@@ -34,7 +34,8 @@
     create_googlepay_plain_payment_resource_ok_test/1,
     create_yandexpay_tokenized_payment_resource_ok_test/1,
     valid_until_payment_resource_test/1,
-    check_support_decrypt_v2_test/1
+    check_support_decrypt_v2_test/1,
+    authorization_forbidden_causes_client_error/1
 ]).
 
 -define(CAPI_IP, "::").
@@ -64,8 +65,13 @@ all() ->
 -spec groups() -> [{group_name(), list(), [test_case_name()]}].
 groups() ->
     [
-        {with_bouncer_auth, [], [{group, payment_resources}]},
-        {with_legacy_auth, [], [{group, payment_resources}]},
+        {with_bouncer_auth, [], [
+            {group, payment_resources},
+            authorization_forbidden_causes_client_error
+        ]},
+        {with_legacy_auth, [], [
+            {group, payment_resources}
+        ]},
         {payment_resources, [], [
             expiration_date_fail_test,
             create_visa_payment_resource_ok_test,
@@ -520,6 +526,27 @@ check_support_decrypt_v2_test(_Config) ->
         PaymentTool
     ),
     ?assertEqual(<<"2020-10-29T23:44:15.499Z">>, capi_utils:deadline_to_binary(ValidUntil)).
+
+%%
+
+-spec authorization_forbidden_causes_client_error(config()) -> _.
+authorization_forbidden_causes_client_error(Config) ->
+    _ = mock_bouncer_arbiter(
+        fun(_) -> {ok, ?JUDGEMENT(?FORBIDDEN)} end,
+        Config
+    ),
+    ?assertEqual(
+        {error, {invalid_response_code, 401}},
+        capi_client_tokens:create_payment_resource(?config(context, Config), #{
+            <<"paymentTool">> => #{
+                <<"paymentToolType">> => <<"PaymentTerminalData">>,
+                <<"provider">> => <<"euroset">>
+            },
+            <<"clientInfo">> => #{
+                <<"fingerprint">> => <<"test fingerprint">>
+            }
+        })
+    ).
 
 %%
 
