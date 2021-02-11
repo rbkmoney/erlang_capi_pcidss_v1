@@ -16,7 +16,6 @@
 
 %% @WARNING Must be refactored in case of different classes of users using this API
 -define(REALM, <<"external">>).
--define(DOMAIN, <<"common-api">>).
 
 -define(SWAG_HANDLER_SCOPE, swag_handler).
 
@@ -35,7 +34,7 @@
 authorize_api_key(OperationID, ApiKey, _HandlerOpts) ->
     scoper:scope(?SWAG_HANDLER_SCOPE, #{operation_id => OperationID}, fun() ->
         _ = logger:debug("Api key authorization started"),
-        case uac:authorize_api_key(ApiKey, get_verification_opts()) of
+        case uac:authorize_api_key(ApiKey, #{}) of
             {ok, Context} ->
                 _ = logger:debug("Api key authorization successful"),
                 {true, Context};
@@ -62,11 +61,6 @@ map_error(validation_error, Error) ->
         <<"code">> => <<"invalidRequest">>,
         <<"message">> => Message
     }).
-
-get_verification_opts() ->
-    #{
-        domains_to_decode => [?DOMAIN]
-    }.
 
 -type request_data() :: #{atom() | binary() => term()}.
 -type handler_opts() :: swag_server:handler_opts(_).
@@ -171,7 +165,7 @@ collect_user_identity(AuthContext) ->
     genlib_map:compact(#{
         id => uac_authorizer_jwt:get_subject_id(AuthContext),
         realm => ?REALM,
-        email => uac_authorizer_jwt:get_claim(<<"email">>, AuthContext, undefined),
+        email => uac_authorizer_jwt:get_subject_email(AuthContext),
         username => uac_authorizer_jwt:get_claim(<<"name">>, AuthContext, undefined)
     }).
 
