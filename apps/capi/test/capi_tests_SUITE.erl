@@ -522,19 +522,19 @@ mock_services(Services, SupOrConfig) ->
 mock_services_(Services, Config) when is_list(Config) ->
     mock_services_(Services, ?config(test_sup, Config));
 mock_services_(Services, SupPid) when is_pid(SupPid) ->
-    Name = lists:map(fun get_service_name/1, Services),
-    Port = get_random_port(),
+    ServerRef = {dummy, lists:map(fun get_service_name/1, Services)},
     {ok, IP} = inet:parse_address(?CAPI_IP),
     ChildSpec = woody_server:child_spec(
-        {dummy, Name},
-        #{
+        ServerRef,
+        Options = #{
             ip => IP,
-            port => Port,
+            port => 0,
             event_handler => {scoper_woody_event_handler, #{}},
             handlers => lists:map(fun mock_service_handler/1, Services)
         }
     ),
     {ok, _} = supervisor:start_child(SupPid, ChildSpec),
+    {IP, Port} = woody_server:get_addr(ServerRef, Options),
     lists:foldl(
         fun(Service, Acc) ->
             ServiceName = get_service_name(Service),
@@ -565,10 +565,6 @@ make_url(ServiceName, Port) ->
 
 make_path(ServiceName) ->
     "/" ++ atom_to_list(ServiceName).
-
-% TODO not so failproof, ideally we need to bind socket first and then give to a ranch listener
-get_random_port() ->
-    rand:uniform(32768) + 32767.
 
 get_context(Token) ->
     capi_client_lib:get_context(?CAPI_URL, Token, 10000, ipv4).
