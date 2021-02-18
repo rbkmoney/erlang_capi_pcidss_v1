@@ -5,8 +5,6 @@
 -export([start_app/1]).
 -export([start_app/2]).
 
--export([issue_token/2]).
--export([issue_token/3]).
 -export([issue_token/4]).
 
 %%
@@ -29,39 +27,24 @@ start_app(AppName) ->
 start_app(AppName, Env) ->
     genlib_app:start_application_with(AppName, Env).
 
--spec issue_token(_, _) ->
-    {ok, binary()}
-    | {error, nonexistent_signee}.
-issue_token(ACL, LifeTime) ->
-    issue_token(?STRING, ACL, LifeTime, #{}).
-
--spec issue_token(_, _, _) ->
-    {ok, binary()}
-    | {error, nonexistent_signee}.
-issue_token(PartyID, ACL, LifeTime) ->
-    issue_token(PartyID, ACL, LifeTime, #{}).
-
 -spec issue_token(_, _, _, _) ->
     {ok, binary()}
     | {error, nonexistent_signee}.
-issue_token(PartyID, ACL, LifeTime, ExtraProperties) ->
-    Claims = maps:merge(
-        #{
-            ?STRING => ?STRING,
-            <<"exp">> => LifeTime,
-            <<"resource_access">> => #{
-                <<"common-api">> => uac_acl:from_list(ACL)
-            }
-        },
-        ExtraProperties
-    ),
+issue_token(Signee, PartyID, ACL, LifeTime) ->
+    Claims = #{
+        ?STRING => ?STRING,
+        <<"exp">> => LifeTime,
+        <<"resource_access">> => #{
+            <<"common-api">> => uac_acl:from_list(ACL)
+        }
+    },
     UniqueId = get_unique_id(),
     genlib:unwrap(
         uac_authorizer_jwt:issue(
             UniqueId,
             PartyID,
             Claims,
-            capi_pcidss
+            Signee
         )
     ).
 

@@ -76,3 +76,5 @@
         message_expiration = ?TIMESTAMP
     }}
 ).
+
+-define(TEST_USER_REALM, <<"external">>).

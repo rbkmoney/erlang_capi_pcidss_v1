@@ -1,13 +1,7 @@
 -module(capi_real_handler).
 
--include_lib("damsel/include/dmsl_payment_processing_thrift.hrl").
 -include_lib("damsel/include/dmsl_domain_thrift.hrl").
 -include_lib("cds_proto/include/cds_proto_storage_thrift.hrl").
--include_lib("damsel/include/dmsl_merch_stat_thrift.hrl").
--include_lib("damsel/include/dmsl_webhooker_thrift.hrl").
--include_lib("damsel/include/dmsl_user_interaction_thrift.hrl").
--include_lib("damsel/include/dmsl_geo_ip_thrift.hrl").
--include_lib("damsel/include/dmsl_reporting_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_tool_provider_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_tool_token_thrift.hrl").
 
@@ -22,7 +16,6 @@
 
 %% @WARNING Must be refactored in case of different classes of users using this API
 -define(REALM, <<"external">>).
--define(DOMAIN, <<"common-api">>).
 
 -define(SWAG_HANDLER_SCOPE, swag_handler).
 
@@ -32,8 +25,6 @@
 -define(DEFAULT_URL_LIFETIME, 60).
 -define(DEFAULT_PAYMENT_TOOL_TOKEN_LIFETIME, <<"64m">>).
 
--define(payment_institution_ref(PaymentInstitutionID), #domain_PaymentInstitutionRef{id = PaymentInstitutionID}).
-
 -define(CAPI_NS, <<"com.rbkmoney.capi">>).
 
 -spec authorize_api_key(swag_server:operation_id(), swag_server:api_key(), handler_opts()) ->
@@ -41,7 +32,7 @@
 authorize_api_key(OperationID, ApiKey, _HandlerOpts) ->
     scoper:scope(?SWAG_HANDLER_SCOPE, #{operation_id => OperationID}, fun() ->
         _ = logger:debug("Api key authorization started"),
-        case uac:authorize_api_key(ApiKey, get_verification_opts()) of
+        case uac:authorize_api_key(ApiKey, #{}) of
             {ok, Context} ->
                 _ = logger:debug("Api key authorization successful"),
                 {true, Context};
@@ -69,11 +60,6 @@ map_error(validation_error, Error) ->
         <<"message">> => Message
     }).
 
-get_verification_opts() ->
-    #{
-        domains_to_decode => [?DOMAIN]
-    }.
-
 -type request_data() :: #{atom() | binary() => term()}.
 -type handler_opts() :: swag_server:handler_opts(_).
 
@@ -92,49 +78,89 @@ handle_request(OperationID, Req, Context, _HandlerOpts) ->
         fun() -> handle_request_(OperationID, Req, Context) end
     ).
 
-handle_request_(OperationID, Req, Context) ->
+-type auth_state() :: {initialized, capi_auth:provider()} | completed.
+
+-type reply() :: {Code :: 200..499, Headers :: #{}, Response :: jsx:json_term() | undefined}.
+
+-record(reqst, {
+    operation_id :: swag_server:operation_id(),
+    user_id :: binary(),
+    auth_st :: auth_state(),
+    request_ctx :: swag_server:request_context(),
+    woody_ctx :: woody_context:ctx(),
+    reply :: reply() | undefined
+}).
+
+-type request_state() :: #reqst{}.
+
+handle_request_(OperationID, Req, ReqCtx) ->
     try
-        ReqContext = create_context(Req, get_auth_context(Context)),
+        AuthCtx = get_auth_context(ReqCtx),
+        WoodyCtx = create_woody_context(Req, AuthCtx),
         _ = logger:debug("Processing request"),
-        OperationACL = capi_auth:get_operation_access(OperationID, Req),
-        case uac:authorize_operation(OperationACL, get_auth_context(Context)) of
-            ok ->
-                process_request(OperationID, Req, Context, ReqContext);
-            {error, _} = Error ->
-                _ = logger:info("Operation ~p authorization failed due to ~p", [OperationID, Error]),
-                {error, {401, #{}, general_error(<<"Unauthorized operation">>)}}
-        end
+        AuthProvider = capi_auth:init_provider(ReqCtx, WoodyCtx),
+        ReqSt1 = #reqst{
+            operation_id = OperationID,
+            user_id = uac_authorizer_jwt:get_subject_id(AuthCtx),
+            auth_st = {initialized, AuthProvider},
+            request_ctx = ReqCtx,
+            woody_ctx = WoodyCtx
+        },
+        ReqSt2 = process_request(OperationID, Req, ReqSt1),
+        assert_reply(assert_auth_completed(ReqSt2))
     catch
+        throw:{forbidden, Reason} ->
+            _ = logger:info("Operation ~p authorization failed due to: ~p", [OperationID, Reason]),
+            % NOTE
+            % Apparently there are no mentions of `401` error conditions in the v1 spec, and I guess
+            % will never be. Hence this `error` tuple.
+            {error, {401, #{}, #{<<"message">> => <<"Unauthorized operation">>}}};
         error:{woody_error, {Source, Class, Details}} ->
             process_woody_error(Source, Class, Details)
     end.
 
--spec process_request(
-    OperationID :: swag_server:operation_id(),
-    Req :: request_data(),
-    Context :: swag_server:request_context(),
-    ReqCtx :: woody_context:ctx()
-) -> {Code :: non_neg_integer(), Headers :: #{}, Response :: #{}}.
-process_request('CreatePaymentResource' = OperationID, Req, Context, ReqCtx) ->
+% NOTE
+% These attributes prevent dialyzer from emitting warnings saying that last clause is in fact
+% unreachable in _correct_ code. It's a kind of safeguard incorrectly marked as warning by the
+% dialyzer being too smart.
+-dialyzer({nowarn_function, [assert_auth_completed/1]}).
+-dialyzer({nowarn_function, [assert_reply/1]}).
+
+-spec assert_auth_completed(request_state()) -> request_state() | no_return().
+assert_auth_completed(#reqst{auth_st = completed} = ReqSt) ->
+    ReqSt;
+assert_auth_completed(#reqst{auth_st = AuthSt, operation_id = OperationID}) ->
+    erlang:error({'Authorization was not completed', OperationID, AuthSt}).
+
+-spec assert_reply(request_state()) -> {ok, reply()} | no_return().
+assert_reply(#reqst{reply = Reply}) when Reply /= undefined ->
+    {ok, Reply};
+assert_reply(#reqst{reply = undefined, operation_id = OperationID}) ->
+    erlang:error({'Nothing to reply with', OperationID}).
+
+-spec process_request(swag_server:operation_id(), request_data(), request_state()) -> request_state().
+process_request('CreatePaymentResource' = OperationID, Req, ReqSt0) ->
+    % TODO assuming implicit party ID here
+    PartyID = get_user_id(ReqSt0),
+    {allowed, ReqSt1} = authorize_operation(#{party => PartyID}, ReqSt0),
+    WoodyCtx = get_woody_context(ReqSt0),
     Params = maps:get('PaymentResourceParams', Req),
-    ClientInfo = enrich_client_info(maps:get(<<"clientInfo">>, Params), Context),
-    PartyID = get_party_id(Context),
+    ClientInfo = enrich_client_info(maps:get(<<"clientInfo">>, Params), ReqSt1),
     try
-        % "V" !!!!
         Data = maps:get(<<"paymentTool">>, Params),
         IdempotentKey = capi_bender:get_idempotent_key(OperationID, PartyID, undefined),
         {PaymentTool, PaymentSessionID} =
             case Data of
                 #{<<"paymentToolType">> := <<"CardData">>} ->
-                    process_card_data(Data, IdempotentKey, ReqCtx);
+                    process_card_data(Data, IdempotentKey, WoodyCtx);
                 #{<<"paymentToolType">> := <<"PaymentTerminalData">>} ->
-                    process_payment_terminal_data(Data, ReqCtx);
+                    process_payment_terminal_data(Data, WoodyCtx);
                 #{<<"paymentToolType">> := <<"DigitalWalletData">>} ->
-                    process_digital_wallet_data(Data, ReqCtx);
+                    process_digital_wallet_data(Data, WoodyCtx);
                 #{<<"paymentToolType">> := <<"TokenizedCardData">>} ->
-                    process_tokenized_card_data(Data, IdempotentKey, ReqCtx);
+                    process_tokenized_card_data(Data, IdempotentKey, WoodyCtx);
                 #{<<"paymentToolType">> := <<"CryptoWalletData">>} ->
-                    process_crypto_wallet_data(Data, ReqCtx)
+                    process_crypto_wallet_data(Data, WoodyCtx)
             end,
         PaymentResource = #domain_DisposablePaymentResource{
             payment_tool = PaymentTool,
@@ -143,10 +169,19 @@ process_request('CreatePaymentResource' = OperationID, Req, Context, ReqCtx) ->
         },
         TokenValidUntil = capi_utils:deadline_from_timeout(payment_tool_token_lifetime()),
         EncryptedToken = capi_crypto:create_encrypted_payment_tool_token(PaymentTool, TokenValidUntil),
-        {ok, {201, #{}, decode_disposable_payment_resource(PaymentResource, EncryptedToken, TokenValidUntil)}}
+        reply(201, decode_disposable_payment_resource(PaymentResource, EncryptedToken, TokenValidUntil), ReqSt1)
     catch
-        Result ->
-            Result
+        throw:{Code, Headers, Response} ->
+            reply(Code, Headers, Response, ReqSt1)
+    end.
+
+authorize_operation(OpPrototype, ReqSt = #reqst{operation_id = OperationID, auth_st = {initialized, Provider}}) ->
+    Resolution = capi_auth:authorize_operation([{operation, OpPrototype#{id => OperationID}}], Provider),
+    case Resolution of
+        {forbidden, _Reason} ->
+            erlang:throw(Resolution);
+        _ ->
+            {Resolution, ReqSt#reqst{auth_st = completed}}
     end.
 
 -spec payment_tool_token_lifetime() -> timeout().
@@ -168,7 +203,7 @@ payment_tool_token_lifetime() ->
 service_call(ServiceName, Function, Args, Context) ->
     capi_woody_client:call_service(ServiceName, Function, Args, Context).
 
-create_context(#{'X-Request-ID' := RequestID}, AuthContext) ->
+create_woody_context(#{'X-Request-ID' := RequestID}, AuthContext) ->
     RpcID = #{trace_id := TraceID} = woody_context:new_rpc_id(genlib:to_binary(RequestID)),
     ok = scoper:add_meta(#{request_id => RequestID, trace_id => TraceID}),
     woody_user_identity:put(collect_user_identity(AuthContext), woody_context:new(RpcID)).
@@ -177,15 +212,12 @@ collect_user_identity(AuthContext) ->
     genlib_map:compact(#{
         id => uac_authorizer_jwt:get_subject_id(AuthContext),
         realm => ?REALM,
-        email => uac_authorizer_jwt:get_claim(<<"email">>, AuthContext, undefined),
+        email => uac_authorizer_jwt:get_subject_email(AuthContext),
         username => uac_authorizer_jwt:get_claim(<<"name">>, AuthContext, undefined)
     }).
 
-logic_error(Code, Message) ->
-    #{<<"code">> => genlib:to_binary(Code), <<"message">> => genlib:to_binary(Message)}.
-
-general_error(Message) ->
-    #{<<"message">> => genlib:to_binary(Message)}.
+bad_request(Code, Message) ->
+    {400, #{}, #{<<"code">> => genlib:to_binary(Code), <<"message">> => genlib:to_binary(Message)}}.
 
 parse_exp_date(undefined) ->
     undefined;
@@ -206,8 +238,19 @@ get_auth_context(#{auth_context := AuthContext}) ->
 get_peer_info(#{peer := Peer}) ->
     Peer.
 
-get_party_id(Context) ->
-    uac_authorizer_jwt:get_subject_id(get_auth_context(Context)).
+get_user_id(#reqst{user_id = UserID}) ->
+    UserID.
+
+get_woody_context(#reqst{woody_ctx = WoodyCtx}) ->
+    WoodyCtx.
+
+reply(Code, Response, ReqSt) ->
+    reply(Code, #{}, Response, ReqSt).
+
+reply(Code, Headers, Response, ReqSt) ->
+    ReqSt#reqst{
+        reply = {Code, Headers, Response}
+    }.
 
 decode_client_info(ClientInfo) ->
     #{
@@ -303,7 +346,7 @@ process_woody_error(_Source, result_unknown, _Details) ->
 reply_5xx(Code) when Code >= 500 andalso Code < 600 ->
     {Code, #{}, <<>>}.
 
-enrich_client_info(ClientInfo, Context) ->
+enrich_client_info(ClientInfo, #reqst{request_ctx = Context}) ->
     ClientInfo#{<<"ip">> => prepare_client_ip(Context)}.
 
 prepare_client_ip(Context) ->
@@ -320,7 +363,7 @@ process_card_data(Data, IdempotentKey, ReqCtx) ->
         ok ->
             put_card_data_to_cds(CardData, ExtraCardData, SessionData, IdempotentKey, BankInfo, ReqCtx);
         {error, Error} ->
-            throw({ok, validation_error(Error)})
+            throw(validation_error(Error))
     end.
 
 put_card_to_cds(PutCardData, ExtraCardData, BankInfo, ReqCtx) ->
@@ -328,7 +371,7 @@ put_card_to_cds(PutCardData, ExtraCardData, BankInfo, ReqCtx) ->
         {ok, #cds_PutCardResult{bank_card = BankCard}} ->
             {bank_card, expand_card_info(BankCard, BankInfo, ExtraCardData)};
         {exception, #cds_InvalidCardData{}} ->
-            throw({ok, {400, #{}, logic_error(invalidRequest, <<"Card data is invalid">>)}})
+            throw(bad_request(invalidRequest, <<"Card data is invalid">>))
     end.
 
 put_session_to_cds(SessionID, SessionData, ReqCtx) ->
@@ -429,7 +472,7 @@ process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
             {ok, Tool} ->
                 Tool;
             {exception, #'InvalidRequest'{}} ->
-                throw({ok, {400, #{}, logic_error(invalidRequest, <<"Tokenized card data is invalid">>)}})
+                throw(bad_request(invalidRequest, <<"Tokenized card data is invalid">>))
         end,
     {CardData, ExtraCardData} = encode_tokenized_card_data(UnwrappedPaymentTool),
     SessionData = encode_tokenized_session_data(UnwrappedPaymentTool),
@@ -450,7 +493,7 @@ process_tokenized_card_data(Data, IdempotentKey, ReqCtx) ->
                 UnwrappedPaymentTool
             );
         {error, Error} ->
-            throw({ok, validation_error(Error)})
+            throw(validation_error(Error))
     end.
 
 process_crypto_wallet_data(Data, _ReqCtx) ->
@@ -655,22 +698,14 @@ get_bank_info(CardDataPan, Context) ->
         {ok, BankInfo} ->
             BankInfo;
         {error, _Reason} ->
-            throw({ok, logic_error(invalidRequest, <<"Unsupported card">>)})
+            throw(bad_request(invalidRequest, <<"Unsupported card">>))
     end.
 
 -spec validation_error(capi_bankcard:reason()) -> swag_server:response().
 validation_error(unrecognized) ->
-    Data = #{
-        <<"code">> => <<"invalidRequest">>,
-        <<"message">> => <<"Unrecognized bank card issuer">>
-    },
-    create_error_resp(400, Data);
+    bad_request(invalidRequest, <<"Unrecognized bank card issuer">>);
 validation_error({invalid, K, C}) ->
-    Data = #{
-        <<"code">> => <<"invalidRequest">>,
-        <<"message">> => validation_msg(C, K)
-    },
-    create_error_resp(400, Data).
+    bad_request(invalidRequest, validation_msg(C, K)).
 
 validation_msg(expiration, _Key) ->
     <<"Invalid expiration date">>;
@@ -685,9 +720,3 @@ key_to_binary(exp_date) ->
     <<"expDate">>;
 key_to_binary(cvv) ->
     <<"cvv">>.
-
-create_error_resp(Code, Data) ->
-    create_error_resp(Code, #{}, Data).
-
-create_error_resp(Code, Headers, Data) ->
-    {Code, Headers, Data}.
