@@ -3,7 +3,6 @@
 -include_lib("damsel/include/dmsl_domain_thrift.hrl").
 -include_lib("cds_proto/include/cds_proto_storage_thrift.hrl").
 -include_lib("damsel/include/dmsl_payment_tool_provider_thrift.hrl").
--include_lib("damsel/include/dmsl_payment_tool_token_thrift.hrl").
 
 -behaviour(swag_server_logic_handler).
 
