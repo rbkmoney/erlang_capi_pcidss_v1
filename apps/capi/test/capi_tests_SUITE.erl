@@ -449,7 +449,7 @@ create_googlepay_plain_payment_resource_ok_test(Config) ->
             },
             <<"clientInfo">> => ClientInfo
         }),
-    false = maps:is_key(<<"tokenProvider">>, Details).
+    ?assertEqual(error, maps:find(<<"tokenProvider">>, Details)).
 
 -spec create_yandexpay_tokenized_payment_resource_ok_test(_) -> _.
 create_yandexpay_tokenized_payment_resource_ok_test(Config) ->
@@ -470,7 +470,8 @@ create_yandexpay_tokenized_payment_resource_ok_test(Config) ->
     _ = mock_bouncer_assert_party_op_ctx(<<"CreatePaymentResource">>, ?STRING, Config),
     ClientInfo = #{<<"fingerprint">> => <<"test fingerprint">>},
     {ok, #{
-        <<"paymentToolDetails">> := #{
+        <<"paymentToolToken">> := EncryptedToken,
+        <<"paymentToolDetails">> := Details = #{
             <<"paymentSystem">> := <<"mastercard">>,
             <<"tokenProvider">> := <<"yandexpay">>
         }
@@ -483,7 +484,23 @@ create_yandexpay_tokenized_payment_resource_ok_test(Config) ->
                 <<"paymentToken">> => #{}
             },
             <<"clientInfo">> => ClientInfo
-        }).
+        }),
+    ?assertEqual(error, maps:find(<<"first6">>, Details)),
+    {ok, {PaymentTool, _Deadline}} = capi_crypto:decrypt_payment_tool_token(EncryptedToken),
+    ?assertMatch(
+        {bank_card, #domain_BankCard{
+            metadata = #{
+                <<"com.rbkmoney.payment-tool-provider">> :=
+                    {obj, #{
+                        {str, <<"details">>} :=
+                            {obj, #{
+                                {str, <<"message_id">>} := {str, ?MESSAGE_ID}
+                            }}
+                    }}
+            }
+        }},
+        PaymentTool
+    ).
 
 -spec valid_until_payment_resource_test(_) -> _.
 valid_until_payment_resource_test(Config) ->

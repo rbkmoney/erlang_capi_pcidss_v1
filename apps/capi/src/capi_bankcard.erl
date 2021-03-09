@@ -3,6 +3,8 @@
 -include_lib("binbase_proto/include/binbase_binbase_thrift.hrl").
 -include_lib("cds_proto/include/cds_proto_storage_thrift.hrl").
 
+-define(META_NS, <<"com.rbkmoney.binbase">>).
+
 -export([lookup_bank_info/2]).
 -export([validate/5]).
 -export([payment_system/1]).
@@ -13,7 +15,7 @@
     bank_name := binary(),
     issuer_country := dmsl_domain_thrift:'Residence'() | undefined,
     category := binary() | undefined,
-    metadata := map()
+    metadata := {_MetaNS :: binary(), map()}
 }.
 
 -type lookup_error() ::
@@ -65,9 +67,7 @@ decode_bank_info(#'binbase_ResponseData'{bin_data = BinData, version = Version})
             bank_name => BinData#binbase_BinData.bank_name,
             issuer_country => decode_issuer_country(BinData#binbase_BinData.iso_country_code),
             category => BinData#binbase_BinData.category,
-            metadata => #{
-                <<"version">> => Version
-            }
+            metadata => {?META_NS, #{<<"version">> => Version}}
         }}
     catch
         {invalid, What} ->
