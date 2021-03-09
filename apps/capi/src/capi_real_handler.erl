@@ -670,9 +670,7 @@ get_payment_token_provider({apple, _}, _PaymentData) ->
 get_payment_token_provider({google, _}, _PaymentData) ->
     googlepay;
 get_payment_token_provider({samsung, _}, _PaymentData) ->
-    samsungpay;
-get_payment_token_provider({yandex, _}, _PaymentData) ->
-    yandexpay.
+    samsungpay.
 
 %% NOTE
 %% Do not drop is_cvv_empty flag for tokenized bank cards which looks like
