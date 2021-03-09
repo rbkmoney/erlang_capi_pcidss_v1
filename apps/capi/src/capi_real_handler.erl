@@ -25,8 +25,6 @@
 -define(DEFAULT_URL_LIFETIME, 60).
 -define(DEFAULT_PAYMENT_TOOL_TOKEN_LIFETIME, <<"64m">>).
 
--define(CAPI_NS, <<"com.rbkmoney.capi">>).
-
 -spec authorize_api_key(swag_server:operation_id(), swag_server:api_key(), handler_opts()) ->
     Result :: false | {true, uac:context()}.
 authorize_api_key(OperationID, ApiKey, _HandlerOpts) ->
@@ -393,9 +391,9 @@ expand_card_info(BankCard, BankInfo, ExtraCardData) ->
         bank_name := BankName,
         issuer_country := IssuerCountry,
         category := Category,
-        metadata := Metadata
+        metadata := {NS, Metadata}
     } = BankInfo,
-    #domain_BankCard{
+    BankCard1 = #domain_BankCard{
         token = BankCard#cds_BankCard.token,
         bin = BankCard#cds_BankCard.bin,
         last_digits = BankCard#cds_BankCard.last_digits,
@@ -404,11 +402,9 @@ expand_card_info(BankCard, BankInfo, ExtraCardData) ->
         issuer_country = IssuerCountry,
         category = Category,
         bank_name = BankName,
-        cardholder_name = genlib_map:get(cardholder, ExtraCardData),
-        metadata = #{
-            ?CAPI_NS => capi_msgp_marshalling:marshal(Metadata)
-        }
-    }.
+        cardholder_name = genlib_map:get(cardholder, ExtraCardData)
+    },
+    add_metadata(NS, Metadata, BankCard1).
 
 encode_card_data(CardData) ->
     ExpDate = parse_exp_date(genlib_map:get(<<"expDate">>, CardData)),
@@ -624,14 +620,16 @@ process_put_card_data_result(
         details = PaymentDetails
     }
 ) ->
-    {
-        {bank_card, BankCard#domain_BankCard{
-            payment_system = PaymentSystem,
-            last_digits = genlib:define(Last4, BankCard#domain_BankCard.last_digits),
-            token_provider = get_payment_token_provider(PaymentDetails, PaymentData)
-        }},
-        SessionID
-    }.
+    TokenProvider = get_payment_token_provider(PaymentDetails, PaymentData),
+    {NS, ProviderMetadata} = extract_payment_tool_provider_metadata(PaymentDetails),
+    BankCard1 = BankCard#domain_BankCard{
+        payment_system = PaymentSystem,
+        last_digits = genlib:define(Last4, BankCard#domain_BankCard.last_digits),
+        token_provider = get_payment_token_provider(PaymentDetails, PaymentData),
+        is_cvv_empty = set_is_empty_cvv(TokenProvider, BankCard)
+    },
+    BankCard2 = add_metadata(NS, ProviderMetadata, BankCard1),
+    {{bank_card, BankCard2}, SessionID}.
 
 decode_disposable_payment_resource(PaymentResource, EncryptedToken, TokenValidUntil) ->
     #domain_DisposablePaymentResource{
@@ -670,6 +668,55 @@ get_payment_token_provider({samsung, _}, _PaymentData) ->
     samsungpay;
 get_payment_token_provider({yandex, _}, _PaymentData) ->
     yandexpay.
+
+%% NOTE
+%% Do not drop is_cvv_empty flag for tokenized bank cards which looks like
+%% simple bank card. This prevent wrong routing decisions in hellgate
+%% when cvv is empty, but is_cvv_empty = undefined, which forces routing to bypass
+%% restrictions and crash adapter. This situation is
+%% only applicable for GooglePay with tokenized bank card via browser.
+set_is_empty_cvv(undefined, BankCard) ->
+    BankCard#domain_BankCard.is_cvv_empty;
+set_is_empty_cvv(_, _) ->
+    undefined.
+
+%% TODO
+%% All this stuff deserves its own module I believe. These super-long names are quite strong hints.
+-define(PAYMENT_TOOL_PROVIDER_META_NS, <<"com.rbkmoney.payment-tool-provider">>).
+
+extract_payment_tool_provider_metadata({_Provider, Details}) ->
+    {?PAYMENT_TOOL_PROVIDER_META_NS, #{
+        <<"details">> => extract_payment_details_metadata(Details)
+    }}.
+
+extract_payment_details_metadata(#paytoolprv_ApplePayDetails{
+    transaction_id = TransactionID,
+    device_id = DeviceID
+}) ->
+    #{
+        <<"transaction_id">> => TransactionID,
+        <<"device_id">> => DeviceID
+    };
+extract_payment_details_metadata(#paytoolprv_SamsungPayDetails{
+    device_id = DeviceID
+}) ->
+    #{
+        <<"device_id">> => DeviceID
+    };
+extract_payment_details_metadata(#paytoolprv_GooglePayDetails{
+    message_id = MessageID
+}) ->
+    #{
+        <<"message_id">> => MessageID
+    };
+extract_payment_details_metadata(#paytoolprv_YandexPayDetails{
+    message_id = MessageID
+}) ->
+    #{
+        <<"message_id">> => MessageID
+    }.
+
+%%
 
 wrap_payment_session(ClientInfo, PaymentSession) ->
     capi_utils:map_to_base64url(#{
@@ -720,3 +767,13 @@ key_to_binary(exp_date) ->
     <<"expDate">>;
 key_to_binary(cvv) ->
     <<"cvv">>.
+
+%%
+
+add_metadata(NS, Metadata, BankCard = #domain_BankCard{metadata = Acc = #{}}) ->
+    undefined = maps:get(NS, Acc, undefined),
+    BankCard#domain_BankCard{
+        metadata = Acc#{NS => capi_msgp_marshalling:marshal(Metadata)}
+    };
+add_metadata(NS, Metadata, BankCard = #domain_BankCard{metadata = undefined}) ->
+    add_metadata(NS, Metadata, BankCard#domain_BankCard{metadata = #{}}).
